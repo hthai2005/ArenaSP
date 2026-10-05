@@ -1,0 +1,143 @@
+{
+  "categorical_cols": [
+    "hall_code",
+    "event_type",
+    "organizer_type"
+  ],
+  "numerical_cols": [
+    "month",
+    "day_of_week",
+    "start_hour",
+    "duration_hours",
+    "end_hour",
+    "is_weekend",
+    "is_peak_hour",
+    "hall_capacity",
+    "registered_attendees",
+    "declared_occupancy_ratio",
+    "is_large_event",
+    "has_special_equipment",
+    "hist_avg_occupancy"
+  ],
+  "feature_columns_out": [
+    "month",
+    "day_of_week",
+    "start_hour",
+    "duration_hours",
+    "end_hour",
+    "is_weekend",
+    "is_peak_hour",
+    "hall_capacity",
+    "registered_attendees",
+    "declared_occupancy_ratio",
+    "is_large_event",
+    "has_special_equipment",
+    "hist_avg_occupancy",
+    "hall_code_HT-01",
+    "hall_code_HT-02",
+    "hall_code_HT-03",
+    "hall_code_HT-04",
+    "hall_code_HT-05",
+    "hall_code_HT-06",
+    "event_type_Giao lưu phong trào",
+    "event_type_Giải thi đấu thể thao",
+    "event_type_Hội nghị / Sự kiện",
+    "event_type_Tập luyện CLB / Đội tuyển",
+    "event_type_Tập thể thao tự do",
+    "organizer_type_CLB_ChuyenNghiep",
+    "organizer_type_DoanhNghiep_TuNhan",
+    "organizer_type_NhomCaNhan",
+    "organizer_type_SoBanNganh_DoanThe",
+    "organizer_type_TruongHoc_DaiHoc"
+  ],
+  "fitted_categories": {
+    "hall_code": [
+      "HT-01",
+      "HT-02",
+      "HT-03",
+      "HT-04",
+      "HT-05",
+      "HT-06"
+    ],
+    "event_type": [
+      "Giao lưu phong trào",
+      "Giải thi đấu thể thao",
+      "Hội nghị / Sự kiện",
+      "Tập luyện CLB / Đội tuyển",
+      "Tập thể thao tự do"
+    ],
+    "organizer_type": [
+      "CLB_ChuyenNghiep",
+      "DoanhNghiep_TuNhan",
+      "NhomCaNhan",
+      "SoBanNganh_DoanThe",
+      "TruongHoc_DaiHoc"
+    ]
+  },
+  "scaler_params": {
+    "month": {
+      "mean": 3.5475,
+      "std": 1.725428769980138
+    },
+    "day_of_week": {
+      "mean": 4.990625,
+      "std": 2.0296210755813577
+    },
+    "start_hour": {
+      "mean": 13.0125,
+      "std": 4.6378375576077175
+    },
+    "duration_hours": {
+      "mean": 2.5678125,
+      "std": 0.8559077497846005
+    },
+    "end_hour": {
+      "mean": 15.5803125,
+      "std": 4.697239475375339
+    },
+    "is_weekend": {
+      "mean": 0.296875,
+      "std": 0.45702382718150736
+    },
+    "is_peak_hour": {
+      "mean": 0.469375,
+      "std": 0.4992172578588305
+    },
+    "hall_capacity": {
+      "mean": 1368.6875,
+      "std": 1108.7127918798667
+    },
+    "registered_attendees": {
+      "mean": 764.909375,
+      "std": 762.0334009918801
+    },
+    "declared_occupancy_ratio": {
+      "mean": 0.536907125,
+      "std": 0.2145334584096852
+    },
+    "is_large_event": {
+      "mean": 0.46875,
+      "std": 0.4991784996211801
+    },
+    "has_special_equipment": {
+      "mean": 0.38125,
+      "std": 0.4858456197485916
+    },
+    "hist_avg_occupancy": {
+      "mean": 0.6414975000000002,
+      "std": 0.12766778433976164
+    }
+  },
+  "label_mapping": {
+    "Thấp": 0,
+    "Trung bình": 1,
+    "Cao": 2,
+    "Quá tải": 3
+  },
+  "reverse_label_mapping": {
+    "0": "Thấp",
+    "1": "Trung bình",
+    "2": "Cao",
+    "3": "Quá tải"
+  }
+}
