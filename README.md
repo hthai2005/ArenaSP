@@ -13,3 +13,6 @@ cd backend
 python -m venv venv
 venv\Scripts\activate
 pip install fastapi uvicorn sqlalchemy pymysql python-jose[cryptography] passlib[bcrypt] python-multipart email-validator
+pip install "pwdlib[argon2]"
+pip install "python-jose[cryptography]" python-dotenv
+python -c "import secrets; print(secrets.token_hex(32))"
