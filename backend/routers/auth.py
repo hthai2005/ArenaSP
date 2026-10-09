@@ -1,13 +1,46 @@
-from fastapi import APIRouter, Depends, HTTPException
+import os
+
+from datetime import datetime, timedelta, timezone
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    HTTPException
+)
+
+from fastapi.security import (
+    HTTPBearer,
+    HTTPAuthorizationCredentials
+)
+
 from sqlalchemy.orm import Session
+
+from jose import JWTError, jwt
 from pwdlib import PasswordHash
+from dotenv import load_dotenv
 
 from database import get_db
 from models import User
+
 from schemas import (
     RegisterRequest,
     LoginRequest,
     UserResponse
+)
+
+
+# Đọc file .env
+load_dotenv()
+
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = "HS256"
+
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    os.getenv(
+        "ACCESS_TOKEN_EXPIRE_MINUTES",
+        "60"
+    )
 )
 
 
@@ -19,6 +52,84 @@ router = APIRouter(
 
 # Mã hóa mật khẩu
 password_hash = PasswordHash.recommended()
+
+
+# Bearer Token
+security = HTTPBearer()
+
+
+# TẠO JWT TOKEN
+
+
+def create_access_token(user_id: int):
+
+    expire = datetime.now(timezone.utc) + timedelta(
+        minutes=ACCESS_TOKEN_EXPIRE_MINUTES
+    )
+
+    payload = {
+        "sub": str(user_id),
+        "exp": expire
+    }
+
+    token = jwt.encode(
+        payload,
+        SECRET_KEY,
+        algorithm=ALGORITHM
+    )
+
+    return token
+
+
+
+# LẤY USER HIỆN TẠI TỪ TOKEN
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+):
+
+    token = credentials.credentials
+
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+
+        user_id = payload.get("sub")
+
+        if user_id is None:
+            raise HTTPException(
+                status_code=401,
+                detail="Token không hợp lệ"
+            )
+
+    except JWTError:
+        raise HTTPException(
+            status_code=401,
+            detail="Token không hợp lệ hoặc đã hết hạn"
+        )
+
+    user = db.query(User).filter(
+        User.id == int(user_id)
+    ).first()
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Không tìm thấy người dùng"
+        )
+
+    if user.status != "ACTIVE":
+        raise HTTPException(
+            status_code=403,
+            detail="Tài khoản đã bị khóa"
+        )
+
+    return user
 
 
 
@@ -45,8 +156,9 @@ def register(
             detail="Tên đăng nhập đã tồn tại"
         )
 
-    # Kiểm tra email nếu người dùng nhập email
+    # Kiểm tra email
     if data.email:
+
         existing_email = db.query(User).filter(
             User.email == data.email
         ).first()
@@ -57,11 +169,12 @@ def register(
                 detail="Email đã được sử dụng"
             )
 
-    # Mã hóa mật khẩu
-    hashed_password = password_hash.hash(data.password)
+    # Hash mật khẩu
+    hashed_password = password_hash.hash(
+        data.password
+    )
 
-    # Tạo user
-    # role_id = 4 -> ORGANIZATION
+    # User đăng ký mặc định là ORGANIZATION
     new_user = User(
         username=data.username,
         password_hash=hashed_password,
@@ -108,15 +221,24 @@ def login(
             detail="Sai tên đăng nhập hoặc mật khẩu"
         )
 
-    # Kiểm tra trạng thái tài khoản
+    # Kiểm tra trạng thái
     if user.status != "ACTIVE":
         raise HTTPException(
             status_code=403,
             detail="Tài khoản đã bị khóa"
         )
 
+    # Tạo JWT
+    access_token = create_access_token(
+        user.id
+    )
+
     return {
         "message": "Đăng nhập thành công",
+
+        "access_token": access_token,
+
+        "token_type": "bearer",
 
         "user": {
             "id": user.id,
@@ -125,8 +247,26 @@ def login(
             "email": user.email,
             "phone": user.phone,
             "role_id": user.role_id,
-            "role": user.role.name
+
+            "role": (
+                user.role.name
                 if user.role
                 else None
+            )
         }
     }
+
+
+# THÔNG TIN USER ĐANG ĐĂNG NHẬP
+
+@router.get(
+    "/me",
+    response_model=UserResponse
+)
+def get_me(
+    current_user: User = Depends(
+        get_current_user
+    )
+):
+
+    return current_user
