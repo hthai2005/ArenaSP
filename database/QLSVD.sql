@@ -53,28 +53,50 @@ CREATE TABLE users (
 CREATE TABLE stadiums (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(200) NOT NULL,
+    official_name VARCHAR(200),
     address VARCHAR(255) NOT NULL,
+    area INT NOT NULL DEFAULT 0,
+    capacity INT NOT NULL DEFAULT 0,
     description TEXT,
-    status ENUM('ACTIVE', 'INACTIVE') DEFAULT 'ACTIVE',
+
+    status ENUM(
+        'active',
+        'maintenance',
+        'inactive'
+    ) DEFAULT 'active',
+
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP
 );
 
--- bảng hội trường/ sân trong nhà
+-- bảng khu vực / sân / phòng chức năng trong nhà thi đấu
 CREATE TABLE halls (
     id INT AUTO_INCREMENT PRIMARY KEY,
+
+    code VARCHAR(20) NOT NULL UNIQUE,
+
     stadium_id INT NOT NULL,
+
     name VARCHAR(150) NOT NULL,
+
     type VARCHAR(100),
+
     capacity INT NOT NULL,
+
+    image VARCHAR(500),
+
     status ENUM(
-        'AVAILABLE',
-        'MAINTENANCE',
-        'INACTIVE'
-    ) DEFAULT 'AVAILABLE',
+        'active',
+        'maintenance',
+        'inactive'
+    ) DEFAULT 'active',
+
     description TEXT,
+
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
@@ -86,22 +108,33 @@ CREATE TABLE halls (
 -- bảng thiết bị
 CREATE TABLE equipments (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    hall_id INT NOT NULL,
+
+    code VARCHAR(20) NOT NULL UNIQUE,
+
+    hall_id INT NULL,
+
     name VARCHAR(150) NOT NULL,
-    quantity INT DEFAULT 1,
+
+    quantity INT NOT NULL DEFAULT 1,
+
+    inspected_at DATE,
+
     status ENUM(
-        'GOOD',
-        'MAINTENANCE',
-        'DAMAGED'
-    ) DEFAULT 'GOOD',
+        'active',
+        'maintenance',
+        'inactive'
+    ) DEFAULT 'active',
+
     description TEXT,
+
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
 
     FOREIGN KEY (hall_id)
         REFERENCES halls(id)
-        ON DELETE CASCADE
+        ON DELETE SET NULL
 );
 
 -- bảng lịch sử hoạt động
@@ -228,10 +261,10 @@ VALUES
 ('STADIUM_UPDATE', 'Cập nhật nhà thi đấu'),
 ('STADIUM_DELETE', 'Xóa nhà thi đấu'),
 
-('HALL_VIEW', 'Xem hội trường'),
-('HALL_CREATE', 'Thêm hội trường'),
-('HALL_UPDATE', 'Cập nhật hội trường'),
-('HALL_DELETE', 'Xóa hội trường'),
+('HALL_VIEW', 'Xem khu vực / sân / phòng chức năng'),
+('HALL_CREATE', 'Thêm khu vực / sân / phòng chức năng'),
+('HALL_UPDATE', 'Cập nhật khu vực / sân / phòng chức năng'),
+('HALL_DELETE', 'Xóa khu vực / sân / phòng chức năng'),
 
 ('EQUIPMENT_VIEW', 'Xem thiết bị'),
 ('EQUIPMENT_CREATE', 'Thêm thiết bị'),
@@ -243,11 +276,11 @@ VALUES
 ('SCHEDULE_UPDATE', 'Cập nhật lịch hoạt động'),
 ('SCHEDULE_DELETE', 'Xóa lịch hoạt động'),
 
-('BOOKING_VIEW', 'Xem yêu cầu đặt hội trường'),
-('BOOKING_CREATE', 'Tạo yêu cầu đặt hội trường'),
-('BOOKING_APPROVE', 'Duyệt yêu cầu đặt hội trường'),
-('BOOKING_REJECT', 'Từ chối yêu cầu đặt hội trường'),
-('BOOKING_CANCEL', 'Hủy yêu cầu đặt hội trường'),
+('BOOKING_VIEW', 'Xem yêu cầu đặt khu vực'),
+('BOOKING_CREATE', 'Tạo yêu cầu đặt khu vực'),
+('BOOKING_APPROVE', 'Duyệt yêu cầu đặt khu vực'),
+('BOOKING_REJECT', 'Từ chối yêu cầu đặt khu vực'),
+('BOOKING_CANCEL', 'Hủy yêu cầu đặt khu vực'),
 
 ('PREDICTION_VIEW', 'Xem kết quả dự báo'),
 ('PREDICTION_RUN', 'Thực hiện dự báo Random Forest'),
@@ -335,3 +368,14 @@ JOIN role_permissions rp
 JOIN permissions p
     ON rp.permission_id = p.id
 ORDER BY r.id, p.id;
+SELECT * FROM users;
+SELECT
+    r.name AS role_name,
+    p.name AS permission_name
+FROM roles r
+JOIN role_permissions rp
+    ON r.id = rp.role_id
+JOIN permissions p
+    ON rp.permission_id = p.id
+ORDER BY r.id, p.id;
+SELECT * FROM stadiums;
