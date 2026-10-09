@@ -1,7 +1,8 @@
 from fastapi import (
     APIRouter,
     Depends,
-    HTTPException
+    HTTPException,
+    status
 )
 
 from sqlalchemy.orm import Session
@@ -44,7 +45,11 @@ def get_stadiums(
     )
 ):
 
-    stadiums = db.query(Stadium).all()
+    stadiums = (
+        db.query(Stadium)
+        .order_by(Stadium.id.asc())
+        .all()
+    )
 
     return stadiums
 
@@ -86,7 +91,8 @@ def get_stadium(
 
 @router.post(
     "/",
-    response_model=StadiumResponse
+    response_model=StadiumResponse,
+    status_code=status.HTTP_201_CREATED
 )
 def create_stadium(
     data: StadiumCreate,
@@ -100,7 +106,10 @@ def create_stadium(
 
     new_stadium = Stadium(
         name=data.name,
+        official_name=data.official_name,
         address=data.address,
+        area=data.area,
+        capacity=data.capacity,
         description=data.description,
         status=data.status
     )
@@ -162,7 +171,9 @@ def update_stadium(
 # XÓA NHÀ THI ĐẤU
 # =====================================================
 
-@router.delete("/{stadium_id}")
+@router.delete(
+    "/{stadium_id}"
+)
 def delete_stadium(
     stadium_id: int,
 
@@ -181,6 +192,18 @@ def delete_stadium(
         raise HTTPException(
             status_code=404,
             detail="Không tìm thấy nhà thi đấu"
+        )
+
+    # Không cho xóa nếu còn khu vực trực thuộc.
+    # Tránh xóa dây chuyền dữ liệu hall/schedule/prediction...
+    if stadium.halls:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Nhà thi đấu vẫn còn khu vực trực thuộc. "
+                "Hãy xóa/chuyển các khu vực trước hoặc "
+                "chuyển nhà thi đấu sang trạng thái inactive."
+            )
         )
 
     db.delete(stadium)

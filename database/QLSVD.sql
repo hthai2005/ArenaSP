@@ -38,7 +38,7 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     full_name VARCHAR(150) NOT NULL,
     email VARCHAR(150) UNIQUE,
-    phone VARCHAR(20),
+    phone VARCHAR(20) UNIQUE,
     role_id INT NOT NULL DEFAULT 4,
     status ENUM('ACTIVE', 'INACTIVE') DEFAULT 'ACTIVE',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

@@ -1,9 +1,19 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import auth, stadiums
-from models import User
-from rbac import require_permission
+from routers import (
+    auth,
+    stadiums,
+    halls,
+    equipments,
+    schedules,
+    bookings
+)
+
+
+# =====================================================
+# KHỞI TẠO FASTAPI
+# =====================================================
 
 app = FastAPI(
     title="ArenaSP API",
@@ -12,53 +22,55 @@ app = FastAPI(
 )
 
 
-# Cho phép React gọi Backend
+# =====================================================
+# CORS
+# Cho phép React Frontend gọi FastAPI Backend
+# =====================================================
+
 app.add_middleware(
     CORSMiddleware,
 
     allow_origins=[
-        "http://localhost:5173"
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
     ],
 
     allow_credentials=True,
+
     allow_methods=["*"],
+
     allow_headers=["*"]
 )
 
 
-# Authentication API
+# =====================================================
+# ĐĂNG KÝ ROUTER
+# =====================================================
+
+# Authentication
 app.include_router(auth.router)
+
+# Nhà thi đấu
 app.include_router(stadiums.router)
 
+# Khu vực / sân / phòng chức năng
+app.include_router(halls.router)
+
+# Thiết bị
+app.include_router(equipments.router)
+
+# LỊCH HOẠT ĐỘNG
+app.include_router(schedules.router)
+
+# Đặt chỗ
+app.include_router(bookings.router)
+
+# =====================================================
+# API KIỂM TRA BACKEND
+# =====================================================
 
 @app.get("/")
 def home():
     return {
         "message": "ArenaSP Backend API đang hoạt động"
-    }
-
-
-@app.get("/api/test/stadium-view")
-def test_stadium_view(
-    current_user: User = Depends(
-        require_permission("STADIUM_VIEW")
-    )
-):
-    return {
-        "message": "Bạn có quyền xem nhà thi đấu",
-        "username": current_user.username,
-        "role": current_user.role.name
-    }
-
-
-@app.post("/api/test/stadium-create")
-def test_stadium_create(
-    current_user: User = Depends(
-        require_permission("STADIUM_CREATE")
-    )
-):
-    return {
-        "message": "Bạn có quyền tạo nhà thi đấu",
-        "username": current_user.username,
-        "role": current_user.role.name
     }

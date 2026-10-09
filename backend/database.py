@@ -1,14 +1,29 @@
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import declarative_base, sessionmaker
 
 
-# Kết nối MySQL
-# Thay MAT_KHAU_MYSQL bằng mật khẩu MySQL của bạn
-DATABASE_URL = "mysql+pymysql://root:09092005@localhost:3306/quan_ly_san_vd"
+BASE_DIR = Path(__file__).resolve().parent
+
+load_dotenv(
+    BASE_DIR / ".env"
+)
+
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if not DATABASE_URL:
+    raise RuntimeError(
+        "Thiếu DATABASE_URL trong file backend/.env"
+    )
 
 
 engine = create_engine(
     DATABASE_URL,
+    pool_pre_ping=True,
     echo=True
 )
 
