@@ -7,7 +7,10 @@ from routers import (
     halls,
     equipments,
     schedules,
-    bookings
+    bookings,
+    users,
+    activity_logs,
+    predictions
 )
 
 
@@ -64,6 +67,15 @@ app.include_router(schedules.router)
 
 # Đặt chỗ
 app.include_router(bookings.router)
+
+# Người dùng
+app.include_router(users.router)
+
+# Nhật ký hoạt động
+app.include_router(activity_logs.router)
+
+# Dự đoán
+app.include_router(predictions.router)
 
 # =====================================================
 # API KIỂM TRA BACKEND

@@ -13,6 +13,10 @@ from pydantic import (
 
 # =====================================================
 # CẤU HÌNH CHUNG
+# snake_case Python <-> camelCase Frontend
+# Ví dụ:
+# stadium_id <-> stadiumId
+# full_name  <-> fullName
 # =====================================================
 
 def to_camel(value: str) -> str:
@@ -40,14 +44,15 @@ class APIModel(BaseModel):
 # =====================================================
 
 class RegisterRequest(APIModel):
-    # Frontend hiện có thể chưa gửi username
+    # Frontend có thể không gửi username
+    # Backend sẽ dùng email hoặc phone làm username
     username: str | None = None
 
     password: str = Field(
         min_length=6
     )
 
-    # Cho phép backend nhận:
+    # Chấp nhận:
     # full_name
     # fullName
     # name
@@ -67,9 +72,9 @@ class RegisterRequest(APIModel):
 class LoginRequest(APIModel):
     # Có thể đăng nhập bằng:
     # username
+    # identifier
     # email
     # phone
-    # identifier
     username: str = Field(
         validation_alias=AliasChoices(
             "username",
@@ -95,6 +100,7 @@ class UserResponse(APIModel):
 
     role_id: int
 
+    # models.py có property role_name
     role: str | None = Field(
         default=None,
         validation_alias=AliasChoices(
@@ -104,6 +110,31 @@ class UserResponse(APIModel):
     )
 
     status: str
+
+
+# =====================================================
+# USER MANAGEMENT
+# =====================================================
+
+class UserUpdate(APIModel):
+    full_name: str | None = None
+
+    email: EmailStr | None = None
+
+    phone: str | None = None
+
+
+class UserRoleUpdate(APIModel):
+    role_id: int = Field(
+        ge=1
+    )
+
+
+class UserStatusUpdate(APIModel):
+    status: Literal[
+        "ACTIVE",
+        "INACTIVE"
+    ]
 
 
 # =====================================================
@@ -185,7 +216,8 @@ class StadiumResponse(APIModel):
 # =====================================================
 
 class HallCreate(APIModel):
-    # Nếu không gửi code, backend có thể tự tạo HT-01...
+    # Nếu không gửi code
+    # backend tự tạo HT-01, HT-02...
     code: str | None = None
 
     stadium_id: int
@@ -253,8 +285,8 @@ class HallResponse(APIModel):
 
     description: str | None = None
 
-    # Không lưu trong halls.
-    # Giá trị này lấy từ relationship equipments.
+    # Không lưu trực tiếp trong bảng halls.
+    # models.py tạo từ relationship equipments.
     equipment: str | None = None
 
 
@@ -263,10 +295,11 @@ class HallResponse(APIModel):
 # =====================================================
 
 class EquipmentCreate(APIModel):
-    # Nếu không gửi code backend có thể tự tạo TB-01...
+    # Nếu không gửi code
+    # backend tự tạo TB-01, TB-02...
     code: str | None = None
 
-    # Có thể NULL cho "Khu kỹ thuật chung"
+    # Có thể NULL cho thiết bị khu kỹ thuật chung
     hall_id: int | None = None
 
     name: str
@@ -352,6 +385,7 @@ class ScheduleCreate(APIModel):
 
     @model_validator(mode="after")
     def validate_time(self):
+
         if self.end_time <= self.start_time:
             raise ValueError(
                 "end_time phải lớn hơn start_time"
@@ -418,6 +452,7 @@ class BookingCreate(APIModel):
 
     @model_validator(mode="after")
     def validate_time(self):
+
         if self.end_time <= self.start_time:
             raise ValueError(
                 "end_time phải lớn hơn start_time"
@@ -496,6 +531,29 @@ class PredictionCreate(APIModel):
     recommended_time: str | None = None
 
 
+# Request dùng cho:
+# POST /api/predictions/predict
+class PredictionRequest(APIModel):
+    hall_id: int
+
+    prediction_date: date
+
+
+# Response sau khi train Random Forest
+class PredictionTrainResponse(APIModel):
+    message: str
+
+    samples: int
+
+    date_from: date
+
+    date_to: date
+
+    mae: float | None = None
+
+    r2: float | None = None
+
+
 class PredictionResponse(APIModel):
     id: int
 
@@ -505,7 +563,11 @@ class PredictionResponse(APIModel):
 
     predicted_usage: float | None = None
 
-    risk_level: str | None = None
+    risk_level: Literal[
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+    ] | None = None
 
     recommended_time: str | None = None
 
