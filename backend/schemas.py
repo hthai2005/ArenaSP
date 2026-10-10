@@ -590,3 +590,62 @@ class ActivityLogResponse(APIModel):
     description: str | None = None
 
     created_at: datetime
+
+# =====================================================
+# ML DATA / DỮ LIỆU LỊCH SỬ CHO RANDOM FOREST
+# =====================================================
+
+class MLHistoryResponse(APIModel):
+    hall_id: int
+
+    hall_code: str
+
+    hall_name: str
+
+    date: date
+
+    capacity: int
+
+    weekday: int
+
+    month: int
+
+    is_weekend: int
+
+    usage_minutes: float
+
+    usage_percent: float
+
+# =====================================================
+# REPORT / THỐNG KÊ DASHBOARD
+# =====================================================
+
+class DashboardSummaryResponse(APIModel):
+    total_stadiums: int
+    total_halls: int
+    active_halls: int
+    maintenance_halls: int
+    total_users: int
+    pending_bookings: int
+    approved_bookings: int
+    total_schedules: int
+    average_occupancy: float
+    high_risk_predictions: int
+
+
+class HallOccupancyResponse(APIModel):
+    hall_id: int
+    hall_code: str
+    hall_name: str
+    usage_minutes: float
+    available_minutes: float
+    usage_percent: float
+    schedule_count: int
+
+
+class DailyOccupancyResponse(APIModel):
+    date: date
+    usage_minutes: float
+    available_minutes: float
+    usage_percent: float
+

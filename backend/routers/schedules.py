@@ -8,6 +8,7 @@ from fastapi import (
 
 from sqlalchemy.orm import Session
 
+from activity_logger import write_activity_log
 from database import get_db
 
 from models import (
@@ -24,6 +25,10 @@ from schemas import (
 
 from rbac import require_permission
 
+
+# =====================================================
+# ROUTER
+# =====================================================
 
 router = APIRouter(
     prefix="/api/schedules",
@@ -42,7 +47,6 @@ def check_schedule_conflict(
     end_time,
     exclude_schedule_id: int | None = None
 ):
-
     query = db.query(Schedule).filter(
         Schedule.hall_id == hall_id,
         Schedule.status != "CANCELLED",
@@ -60,6 +64,7 @@ def check_schedule_conflict(
 
 # =====================================================
 # LẤY DANH SÁCH LỊCH
+# Có thể lọc theo hallId
 # =====================================================
 
 @router.get(
@@ -67,7 +72,10 @@ def check_schedule_conflict(
     response_model=list[ScheduleResponse]
 )
 def get_schedules(
-    hall_id: int | None = Query(default=None),
+    hall_id: int | None = Query(
+        default=None,
+        alias="hallId"
+    ),
 
     db: Session = Depends(get_db),
 
@@ -75,7 +83,6 @@ def get_schedules(
         require_permission("SCHEDULE_VIEW")
     )
 ):
-
     query = db.query(Schedule)
 
     if hall_id is not None:
@@ -83,11 +90,15 @@ def get_schedules(
             Schedule.hall_id == hall_id
         )
 
-    return (
+    schedules = (
         query
-        .order_by(Schedule.start_time.asc())
+        .order_by(
+            Schedule.start_time.asc()
+        )
         .all()
     )
+
+    return schedules
 
 
 # =====================================================
@@ -107,10 +118,13 @@ def get_schedule(
         require_permission("SCHEDULE_VIEW")
     )
 ):
-
-    schedule = db.query(Schedule).filter(
-        Schedule.id == schedule_id
-    ).first()
+    schedule = (
+        db.query(Schedule)
+        .filter(
+            Schedule.id == schedule_id
+        )
+        .first()
+    )
 
     if not schedule:
         raise HTTPException(
@@ -139,10 +153,17 @@ def create_schedule(
         require_permission("SCHEDULE_CREATE")
     )
 ):
+    # -------------------------------------------------
+    # Kiểm tra Hall tồn tại
+    # -------------------------------------------------
 
-    hall = db.query(Hall).filter(
-        Hall.id == data.hall_id
-    ).first()
+    hall = (
+        db.query(Hall)
+        .filter(
+            Hall.id == data.hall_id
+        )
+        .first()
+    )
 
     if not hall:
         raise HTTPException(
@@ -150,24 +171,44 @@ def create_schedule(
             detail="Không tìm thấy khu vực thi đấu"
         )
 
+    # -------------------------------------------------
+    # Không tạo lịch cho Hall bảo trì / inactive
+    # -------------------------------------------------
+
     if hall.status != "active":
         raise HTTPException(
             status_code=400,
-            detail="Khu vực hiện không hoạt động hoặc đang bảo trì"
+            detail=(
+                "Khu vực hiện không hoạt động "
+                "hoặc đang bảo trì"
+            )
         )
 
-    conflict = check_schedule_conflict(
-        db=db,
-        hall_id=data.hall_id,
-        start_time=data.start_time,
-        end_time=data.end_time
-    )
+    # -------------------------------------------------
+    # Kiểm tra trùng lịch
+    #
+    # Nếu lịch mới là CANCELLED thì không cần
+    # kiểm tra xung đột.
+    # -------------------------------------------------
 
-    if conflict:
-        raise HTTPException(
-            status_code=400,
-            detail="Khung giờ này đã có lịch hoạt động"
+    if data.status != "CANCELLED":
+
+        conflict = check_schedule_conflict(
+            db=db,
+            hall_id=data.hall_id,
+            start_time=data.start_time,
+            end_time=data.end_time
         )
+
+        if conflict:
+            raise HTTPException(
+                status_code=400,
+                detail="Khung giờ này đã có lịch hoạt động"
+            )
+
+    # -------------------------------------------------
+    # Tạo lịch
+    # -------------------------------------------------
 
     new_schedule = Schedule(
         hall_id=data.hall_id,
@@ -181,6 +222,21 @@ def create_schedule(
     db.add(new_schedule)
     db.commit()
     db.refresh(new_schedule)
+
+    # -------------------------------------------------
+    # ACTIVITY LOG
+    # -------------------------------------------------
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="CREATE_SCHEDULE",
+        target=f"schedule:{new_schedule.id}",
+        description=(
+            f"Tạo lịch {new_schedule.title} "
+            f"cho khu vực {hall.code} - {hall.name}"
+        )
+    )
 
     return new_schedule
 
@@ -203,10 +259,13 @@ def update_schedule(
         require_permission("SCHEDULE_UPDATE")
     )
 ):
-
-    schedule = db.query(Schedule).filter(
-        Schedule.id == schedule_id
-    ).first()
+    schedule = (
+        db.query(Schedule)
+        .filter(
+            Schedule.id == schedule_id
+        )
+        .first()
+    )
 
     if not schedule:
         raise HTTPException(
@@ -214,9 +273,24 @@ def update_schedule(
             detail="Không tìm thấy lịch hoạt động"
         )
 
+    # -------------------------------------------------
+    # Lưu thông tin cũ để ghi Activity Log
+    # -------------------------------------------------
+
+    old_title = schedule.title
+    old_status = schedule.status
+
+    # -------------------------------------------------
+    # Lấy những field frontend thực sự gửi
+    # -------------------------------------------------
+
     update_data = data.model_dump(
         exclude_unset=True
     )
+
+    # -------------------------------------------------
+    # Xác định dữ liệu sau khi cập nhật
+    # -------------------------------------------------
 
     hall_id = update_data.get(
         "hall_id",
@@ -233,15 +307,32 @@ def update_schedule(
         schedule.end_time
     )
 
+    final_status = update_data.get(
+        "status",
+        schedule.status
+    )
+
+    # -------------------------------------------------
+    # Kiểm tra thời gian
+    # -------------------------------------------------
+
     if end_time <= start_time:
         raise HTTPException(
             status_code=400,
             detail="end_time phải lớn hơn start_time"
         )
 
-    hall = db.query(Hall).filter(
-        Hall.id == hall_id
-    ).first()
+    # -------------------------------------------------
+    # Kiểm tra Hall tồn tại
+    # -------------------------------------------------
+
+    hall = (
+        db.query(Hall)
+        .filter(
+            Hall.id == hall_id
+        )
+        .first()
+    )
 
     if not hall:
         raise HTTPException(
@@ -249,19 +340,51 @@ def update_schedule(
             detail="Không tìm thấy khu vực thi đấu"
         )
 
-    conflict = check_schedule_conflict(
-        db=db,
-        hall_id=hall_id,
-        start_time=start_time,
-        end_time=end_time,
-        exclude_schedule_id=schedule_id
-    )
+    # -------------------------------------------------
+    # Nếu đổi Hall thì Hall mới phải hoạt động
+    #
+    # Riêng khi chuyển lịch thành CANCELLED thì
+    # vẫn cho phép dù Hall đang maintenance/inactive.
+    # -------------------------------------------------
 
-    if conflict:
+    if (
+        final_status != "CANCELLED"
+        and hall.status != "active"
+    ):
         raise HTTPException(
             status_code=400,
-            detail="Khung giờ này bị trùng lịch"
+            detail=(
+                "Khu vực hiện không hoạt động "
+                "hoặc đang bảo trì"
+            )
         )
+
+    # -------------------------------------------------
+    # Kiểm tra trùng lịch
+    #
+    # Nếu đang chuyển lịch thành CANCELLED
+    # thì không cần kiểm tra xung đột.
+    # -------------------------------------------------
+
+    if final_status != "CANCELLED":
+
+        conflict = check_schedule_conflict(
+            db=db,
+            hall_id=hall_id,
+            start_time=start_time,
+            end_time=end_time,
+            exclude_schedule_id=schedule_id
+        )
+
+        if conflict:
+            raise HTTPException(
+                status_code=400,
+                detail="Khung giờ này bị trùng lịch"
+            )
+
+    # -------------------------------------------------
+    # Cập nhật dữ liệu
+    # -------------------------------------------------
 
     for field, value in update_data.items():
         setattr(
@@ -273,6 +396,27 @@ def update_schedule(
     db.commit()
     db.refresh(schedule)
 
+    # -------------------------------------------------
+    # ACTIVITY LOG
+    # -------------------------------------------------
+
+    changed_fields = ", ".join(
+        update_data.keys()
+    )
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="UPDATE_SCHEDULE",
+        target=f"schedule:{schedule.id}",
+        description=(
+            f"Cập nhật lịch {old_title}. "
+            f"Trường thay đổi: {changed_fields}. "
+            f"Trạng thái trước: {old_status}, "
+            f"trạng thái hiện tại: {schedule.status}"
+        )
+    )
+
     return schedule
 
 
@@ -280,7 +424,9 @@ def update_schedule(
 # XÓA LỊCH
 # =====================================================
 
-@router.delete("/{schedule_id}")
+@router.delete(
+    "/{schedule_id}"
+)
 def delete_schedule(
     schedule_id: int,
 
@@ -290,10 +436,13 @@ def delete_schedule(
         require_permission("SCHEDULE_DELETE")
     )
 ):
-
-    schedule = db.query(Schedule).filter(
-        Schedule.id == schedule_id
-    ).first()
+    schedule = (
+        db.query(Schedule)
+        .filter(
+            Schedule.id == schedule_id
+        )
+        .first()
+    )
 
     if not schedule:
         raise HTTPException(
@@ -301,8 +450,31 @@ def delete_schedule(
             detail="Không tìm thấy lịch hoạt động"
         )
 
+    # -------------------------------------------------
+    # Lưu thông tin trước khi xóa
+    # -------------------------------------------------
+
+    deleted_schedule_id = schedule.id
+    deleted_schedule_title = schedule.title
+    deleted_hall_id = schedule.hall_id
+
     db.delete(schedule)
     db.commit()
+
+    # -------------------------------------------------
+    # ACTIVITY LOG
+    # -------------------------------------------------
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="DELETE_SCHEDULE",
+        target=f"schedule:{deleted_schedule_id}",
+        description=(
+            f"Xóa lịch {deleted_schedule_title}. "
+            f"Hall ID: {deleted_hall_id}"
+        )
+    )
 
     return {
         "message": "Xóa lịch hoạt động thành công"

@@ -8,6 +8,7 @@ from fastapi import (
 
 from sqlalchemy.orm import Session
 
+from activity_logger import write_activity_log
 from database import get_db
 
 from models import (
@@ -44,16 +45,19 @@ router = APIRouter(
 def generate_hall_code(
     db: Session
 ):
-
     number = 1
 
     while True:
 
         code = f"HT-{number:02d}"
 
-        existing = db.query(Hall).filter(
-            Hall.code == code
-        ).first()
+        existing = (
+            db.query(Hall)
+            .filter(
+                Hall.code == code
+            )
+            .first()
+        )
 
         if not existing:
             return code
@@ -63,7 +67,7 @@ def generate_hall_code(
 
 # =====================================================
 # LẤY DANH SÁCH KHU VỰC
-# Có thể lọc theo stadium_id
+# Có thể lọc theo stadiumId
 # =====================================================
 
 @router.get(
@@ -72,7 +76,8 @@ def generate_hall_code(
 )
 def get_halls(
     stadium_id: int | None = Query(
-        default=None
+        default=None,
+        alias="stadiumId"
     ),
 
     db: Session = Depends(get_db),
@@ -81,7 +86,6 @@ def get_halls(
         require_permission("HALL_VIEW")
     )
 ):
-
     query = db.query(Hall)
 
     if stadium_id is not None:
@@ -116,10 +120,13 @@ def get_hall(
         require_permission("HALL_VIEW")
     )
 ):
-
-    hall = db.query(Hall).filter(
-        Hall.id == hall_id
-    ).first()
+    hall = (
+        db.query(Hall)
+        .filter(
+            Hall.id == hall_id
+        )
+        .first()
+    )
 
     if not hall:
 
@@ -149,14 +156,17 @@ def create_hall(
         require_permission("HALL_CREATE")
     )
 ):
-
     # -------------------------------------------------
     # Kiểm tra nhà thi đấu tồn tại
     # -------------------------------------------------
 
-    stadium = db.query(Stadium).filter(
-        Stadium.id == data.stadium_id
-    ).first()
+    stadium = (
+        db.query(Stadium)
+        .filter(
+            Stadium.id == data.stadium_id
+        )
+        .first()
+    )
 
     if not stadium:
 
@@ -182,9 +192,13 @@ def create_hall(
     # Kiểm tra mã khu vực trùng
     # -------------------------------------------------
 
-    existing_code = db.query(Hall).filter(
-        Hall.code == code
-    ).first()
+    existing_code = (
+        db.query(Hall)
+        .filter(
+            Hall.code == code
+        )
+        .first()
+    )
 
     if existing_code:
 
@@ -212,6 +226,23 @@ def create_hall(
     db.commit()
     db.refresh(new_hall)
 
+    # -------------------------------------------------
+    # ACTIVITY LOG
+    # -------------------------------------------------
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="CREATE_HALL",
+        target=f"hall:{new_hall.id}",
+        description=(
+            f"Tạo khu vực "
+            f"{new_hall.code} - "
+            f"{new_hall.name} "
+            f"thuộc {stadium.name}"
+        )
+    )
+
     return new_hall
 
 
@@ -234,10 +265,13 @@ def update_hall(
         require_permission("HALL_UPDATE")
     )
 ):
-
-    hall = db.query(Hall).filter(
-        Hall.id == hall_id
-    ).first()
+    hall = (
+        db.query(Hall)
+        .filter(
+            Hall.id == hall_id
+        )
+        .first()
+    )
 
     if not hall:
 
@@ -245,6 +279,10 @@ def update_hall(
             status_code=404,
             detail="Không tìm thấy khu vực thi đấu"
         )
+
+    # Lưu thông tin cũ để ghi log
+    old_code = hall.code
+    old_name = hall.name
 
     update_data = data.model_dump(
         exclude_unset=True
@@ -268,9 +306,13 @@ def update_hall(
                 detail="stadium_id không được để trống"
             )
 
-        stadium = db.query(Stadium).filter(
-            Stadium.id == stadium_id
-        ).first()
+        stadium = (
+            db.query(Stadium)
+            .filter(
+                Stadium.id == stadium_id
+            )
+            .first()
+        )
 
         if not stadium:
 
@@ -288,7 +330,10 @@ def update_hall(
 
         code = update_data["code"]
 
-        if code is None or not code.strip():
+        if (
+            code is None
+            or not code.strip()
+        ):
 
             raise HTTPException(
                 status_code=400,
@@ -297,10 +342,14 @@ def update_hall(
 
         code = code.strip()
 
-        existing_code = db.query(Hall).filter(
-            Hall.code == code,
-            Hall.id != hall_id
-        ).first()
+        existing_code = (
+            db.query(Hall)
+            .filter(
+                Hall.code == code,
+                Hall.id != hall_id
+            )
+            .first()
+        )
 
         if existing_code:
 
@@ -326,6 +375,27 @@ def update_hall(
     db.commit()
     db.refresh(hall)
 
+    # -------------------------------------------------
+    # ACTIVITY LOG
+    # -------------------------------------------------
+
+    changed_fields = ", ".join(
+        update_data.keys()
+    )
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="UPDATE_HALL",
+        target=f"hall:{hall.id}",
+        description=(
+            f"Cập nhật khu vực "
+            f"{old_code} - {old_name}. "
+            f"Trường thay đổi: "
+            f"{changed_fields}"
+        )
+    )
+
     return hall
 
 
@@ -345,10 +415,13 @@ def delete_hall(
         require_permission("HALL_DELETE")
     )
 ):
-
-    hall = db.query(Hall).filter(
-        Hall.id == hall_id
-    ).first()
+    hall = (
+        db.query(Hall)
+        .filter(
+            Hall.id == hall_id
+        )
+        .first()
+    )
 
     if not hall:
 
@@ -359,14 +432,16 @@ def delete_hall(
 
     # -------------------------------------------------
     # Không xóa khu vực nếu đã có booking
-    #
-    # Vì cần giữ lại lịch sử đặt chỗ.
-    # Có thể chuyển status = inactive thay vì xóa.
+    # Vì cần giữ lại lịch sử đặt chỗ
     # -------------------------------------------------
 
-    booking = db.query(Booking).filter(
-        Booking.hall_id == hall_id
-    ).first()
+    booking = (
+        db.query(Booking)
+        .filter(
+            Booking.hall_id == hall_id
+        )
+        .first()
+    )
 
     if booking:
 
@@ -379,8 +454,32 @@ def delete_hall(
             )
         )
 
+    # -------------------------------------------------
+    # Lưu thông tin trước khi xóa
+    # -------------------------------------------------
+
+    deleted_hall_id = hall.id
+    deleted_hall_code = hall.code
+    deleted_hall_name = hall.name
+
     db.delete(hall)
     db.commit()
+
+    # -------------------------------------------------
+    # ACTIVITY LOG
+    # -------------------------------------------------
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="DELETE_HALL",
+        target=f"hall:{deleted_hall_id}",
+        description=(
+            f"Xóa khu vực "
+            f"{deleted_hall_code} - "
+            f"{deleted_hall_name}"
+        )
+    )
 
     return {
         "message": "Xóa khu vực thi đấu thành công"

@@ -7,6 +7,7 @@ from fastapi import (
 
 from sqlalchemy.orm import Session
 
+from activity_logger import write_activity_log
 from database import get_db
 
 from models import (
@@ -44,16 +45,12 @@ def check_schedule_conflict(
     start_time,
     end_time
 ):
-
     conflict = (
         db.query(Schedule)
         .filter(
             Schedule.hall_id == hall_id,
-
             Schedule.status != "CANCELLED",
-
             Schedule.start_time < end_time,
-
             Schedule.end_time > start_time
         )
         .first()
@@ -74,7 +71,6 @@ def check_booking_conflict(
     exclude_booking_id: int | None = None,
     include_pending: bool = True
 ):
-
     statuses = ["APPROVED"]
 
     if include_pending:
@@ -82,16 +78,12 @@ def check_booking_conflict(
 
     query = db.query(Booking).filter(
         Booking.hall_id == hall_id,
-
         Booking.status.in_(statuses),
-
         Booking.start_time < end_time,
-
         Booking.end_time > start_time
     )
 
     if exclude_booking_id is not None:
-
         query = query.filter(
             Booking.id != exclude_booking_id
         )
@@ -114,7 +106,6 @@ def get_bookings(
         require_permission("BOOKING_VIEW")
     )
 ):
-
     query = db.query(Booking)
 
     # Đơn vị sử dụng chỉ được xem booking của chính mình
@@ -122,7 +113,6 @@ def get_bookings(
         current_user.role
         and current_user.role.name == "ORGANIZATION"
     ):
-
         query = query.filter(
             Booking.user_id == current_user.id
         )
@@ -153,13 +143,15 @@ def get_booking(
         require_permission("BOOKING_VIEW")
     )
 ):
-
-    booking = db.query(Booking).filter(
-        Booking.id == booking_id
-    ).first()
+    booking = (
+        db.query(Booking)
+        .filter(
+            Booking.id == booking_id
+        )
+        .first()
+    )
 
     if not booking:
-
         raise HTTPException(
             status_code=404,
             detail="Không tìm thấy yêu cầu đặt chỗ"
@@ -171,7 +163,6 @@ def get_booking(
         and current_user.role.name == "ORGANIZATION"
         and booking.user_id != current_user.id
     ):
-
         raise HTTPException(
             status_code=403,
             detail="Bạn không được xem booking của người khác"
@@ -198,17 +189,19 @@ def create_booking(
         require_permission("BOOKING_CREATE")
     )
 ):
-
     # -------------------------------------------------
     # Kiểm tra khu vực tồn tại
     # -------------------------------------------------
 
-    hall = db.query(Hall).filter(
-        Hall.id == data.hall_id
-    ).first()
+    hall = (
+        db.query(Hall)
+        .filter(
+            Hall.id == data.hall_id
+        )
+        .first()
+    )
 
     if not hall:
-
         raise HTTPException(
             status_code=404,
             detail="Không tìm thấy khu vực thi đấu"
@@ -219,7 +212,6 @@ def create_booking(
     # -------------------------------------------------
 
     if hall.status != "active":
-
         raise HTTPException(
             status_code=400,
             detail=(
@@ -240,12 +232,9 @@ def create_booking(
     )
 
     if schedule_conflict:
-
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Khung giờ này đã có lịch hoạt động"
-            )
+            detail="Khung giờ này đã có lịch hoạt động"
         )
 
     # -------------------------------------------------
@@ -261,12 +250,9 @@ def create_booking(
     )
 
     if booking_conflict:
-
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Khung giờ này đã có yêu cầu đặt chỗ"
-            )
+            detail="Khung giờ này đã có yêu cầu đặt chỗ"
         )
 
     # -------------------------------------------------
@@ -289,6 +275,21 @@ def create_booking(
     db.commit()
     db.refresh(new_booking)
 
+    # -------------------------------------------------
+    # Ghi Activity Log
+    # -------------------------------------------------
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="CREATE_BOOKING",
+        target=f"booking:{new_booking.id}",
+        description=(
+            f"Tạo yêu cầu đặt khu vực "
+            f"{hall.name} - {new_booking.title}"
+        )
+    )
+
     return new_booking
 
 
@@ -309,20 +310,21 @@ def approve_booking(
         require_permission("BOOKING_APPROVE")
     )
 ):
-
-    booking = db.query(Booking).filter(
-        Booking.id == booking_id
-    ).first()
+    booking = (
+        db.query(Booking)
+        .filter(
+            Booking.id == booking_id
+        )
+        .first()
+    )
 
     if not booking:
-
         raise HTTPException(
             status_code=404,
             detail="Không tìm thấy yêu cầu đặt chỗ"
         )
 
     if booking.status != "PENDING":
-
         raise HTTPException(
             status_code=400,
             detail="Chỉ có thể duyệt booking đang PENDING"
@@ -332,19 +334,21 @@ def approve_booking(
     # Kiểm tra khu vực
     # -------------------------------------------------
 
-    hall = db.query(Hall).filter(
-        Hall.id == booking.hall_id
-    ).first()
+    hall = (
+        db.query(Hall)
+        .filter(
+            Hall.id == booking.hall_id
+        )
+        .first()
+    )
 
     if not hall:
-
         raise HTTPException(
             status_code=404,
             detail="Không tìm thấy khu vực thi đấu"
         )
 
     if hall.status != "active":
-
         raise HTTPException(
             status_code=400,
             detail=(
@@ -356,7 +360,7 @@ def approve_booking(
     # -------------------------------------------------
     # Trước khi duyệt phải kiểm tra lại lịch
     # Vì trong thời gian booking chờ duyệt,
-    # lịch có thể đã thay đổi.
+    # lịch có thể đã thay đổi
     # -------------------------------------------------
 
     schedule_conflict = check_schedule_conflict(
@@ -367,7 +371,6 @@ def approve_booking(
     )
 
     if schedule_conflict:
-
         raise HTTPException(
             status_code=400,
             detail=(
@@ -391,7 +394,6 @@ def approve_booking(
     )
 
     if approved_conflict:
-
         raise HTTPException(
             status_code=400,
             detail=(
@@ -426,6 +428,21 @@ def approve_booking(
     db.commit()
     db.refresh(booking)
 
+    # -------------------------------------------------
+    # Ghi Activity Log
+    # -------------------------------------------------
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="APPROVE_BOOKING",
+        target=f"booking:{booking.id}",
+        description=(
+            f"Duyệt yêu cầu đặt khu vực "
+            f"{hall.name} - {booking.title}"
+        )
+    )
+
     return booking
 
 
@@ -446,20 +463,21 @@ def reject_booking(
         require_permission("BOOKING_REJECT")
     )
 ):
-
-    booking = db.query(Booking).filter(
-        Booking.id == booking_id
-    ).first()
+    booking = (
+        db.query(Booking)
+        .filter(
+            Booking.id == booking_id
+        )
+        .first()
+    )
 
     if not booking:
-
         raise HTTPException(
             status_code=404,
             detail="Không tìm thấy yêu cầu đặt chỗ"
         )
 
     if booking.status != "PENDING":
-
         raise HTTPException(
             status_code=400,
             detail="Chỉ có thể từ chối booking đang PENDING"
@@ -469,6 +487,21 @@ def reject_booking(
 
     db.commit()
     db.refresh(booking)
+
+    # -------------------------------------------------
+    # Ghi Activity Log
+    # -------------------------------------------------
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="REJECT_BOOKING",
+        target=f"booking:{booking.id}",
+        description=(
+            f"Từ chối yêu cầu đặt - "
+            f"{booking.title}"
+        )
+    )
 
     return booking
 
@@ -490,13 +523,15 @@ def cancel_booking(
         require_permission("BOOKING_CANCEL")
     )
 ):
-
-    booking = db.query(Booking).filter(
-        Booking.id == booking_id
-    ).first()
+    booking = (
+        db.query(Booking)
+        .filter(
+            Booking.id == booking_id
+        )
+        .first()
+    )
 
     if not booking:
-
         raise HTTPException(
             status_code=404,
             detail="Không tìm thấy yêu cầu đặt chỗ"
@@ -511,33 +546,32 @@ def cancel_booking(
         and current_user.role.name == "ORGANIZATION"
         and booking.user_id != current_user.id
     ):
-
         raise HTTPException(
             status_code=403,
             detail="Bạn không được hủy booking của người khác"
         )
 
     # -------------------------------------------------
-    # Không cho hủy nếu đã rejected/cancelled
+    # Không cho hủy nếu đã REJECTED / CANCELLED
     # -------------------------------------------------
 
     if booking.status in (
         "REJECTED",
         "CANCELLED"
     ):
-
         raise HTTPException(
             status_code=400,
             detail="Booking này không thể hủy"
         )
 
+    # Lưu trạng thái cũ để ghi log
     old_status = booking.status
 
     booking.status = "CANCELLED"
 
     # -------------------------------------------------
     # Nếu booking trước đó đã APPROVED
-    # thì tìm schedule tương ứng và CANCELLED.
+    # thì tìm schedule tương ứng và CANCELLED
     #
     # Do thiết kế DB hiện tại không có booking_id
     # trong schedules nên đối chiếu bằng:
@@ -545,19 +579,38 @@ def cancel_booking(
     # -------------------------------------------------
 
     if old_status == "APPROVED":
-
-        schedule = db.query(Schedule).filter(
-            Schedule.hall_id == booking.hall_id,
-            Schedule.title == booking.title,
-            Schedule.start_time == booking.start_time,
-            Schedule.end_time == booking.end_time,
-            Schedule.status != "CANCELLED"
-        ).first()
+        schedule = (
+            db.query(Schedule)
+            .filter(
+                Schedule.hall_id == booking.hall_id,
+                Schedule.title == booking.title,
+                Schedule.start_time == booking.start_time,
+                Schedule.end_time == booking.end_time,
+                Schedule.status != "CANCELLED"
+            )
+            .first()
+        )
 
         if schedule:
             schedule.status = "CANCELLED"
 
     db.commit()
     db.refresh(booking)
+
+    # -------------------------------------------------
+    # Ghi Activity Log
+    # -------------------------------------------------
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="CANCEL_BOOKING",
+        target=f"booking:{booking.id}",
+        description=(
+            f"Hủy yêu cầu đặt - "
+            f"{booking.title}. "
+            f"Trạng thái trước: {old_status}"
+        )
+    )
 
     return booking

@@ -7,6 +7,7 @@ from fastapi import (
 
 from sqlalchemy.orm import Session
 
+from activity_logger import write_activity_log
 from database import get_db
 
 from models import (
@@ -22,6 +23,10 @@ from schemas import (
 
 from rbac import require_permission
 
+
+# =====================================================
+# ROUTER
+# =====================================================
 
 router = APIRouter(
     prefix="/api/stadiums",
@@ -44,7 +49,6 @@ def get_stadiums(
         require_permission("STADIUM_VIEW")
     )
 ):
-
     stadiums = (
         db.query(Stadium)
         .order_by(Stadium.id.asc())
@@ -71,10 +75,13 @@ def get_stadium(
         require_permission("STADIUM_VIEW")
     )
 ):
-
-    stadium = db.query(Stadium).filter(
-        Stadium.id == stadium_id
-    ).first()
+    stadium = (
+        db.query(Stadium)
+        .filter(
+            Stadium.id == stadium_id
+        )
+        .first()
+    )
 
     if not stadium:
         raise HTTPException(
@@ -103,7 +110,6 @@ def create_stadium(
         require_permission("STADIUM_CREATE")
     )
 ):
-
     new_stadium = Stadium(
         name=data.name,
         official_name=data.official_name,
@@ -117,6 +123,21 @@ def create_stadium(
     db.add(new_stadium)
     db.commit()
     db.refresh(new_stadium)
+
+    # =================================================
+    # ACTIVITY LOG
+    # =================================================
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="CREATE_STADIUM",
+        target=f"stadium:{new_stadium.id}",
+        description=(
+            f"Tạo nhà thi đấu: "
+            f"{new_stadium.name}"
+        )
+    )
 
     return new_stadium
 
@@ -139,16 +160,22 @@ def update_stadium(
         require_permission("STADIUM_UPDATE")
     )
 ):
-
-    stadium = db.query(Stadium).filter(
-        Stadium.id == stadium_id
-    ).first()
+    stadium = (
+        db.query(Stadium)
+        .filter(
+            Stadium.id == stadium_id
+        )
+        .first()
+    )
 
     if not stadium:
         raise HTTPException(
             status_code=404,
             detail="Không tìm thấy nhà thi đấu"
         )
+
+    # Lưu tên cũ để ghi log nếu cần
+    old_name = stadium.name
 
     update_data = data.model_dump(
         exclude_unset=True
@@ -163,6 +190,27 @@ def update_stadium(
 
     db.commit()
     db.refresh(stadium)
+
+    # =================================================
+    # ACTIVITY LOG
+    # =================================================
+
+    changed_fields = ", ".join(
+        update_data.keys()
+    )
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="UPDATE_STADIUM",
+        target=f"stadium:{stadium.id}",
+        description=(
+            f"Cập nhật nhà thi đấu "
+            f"{old_name}. "
+            f"Trường thay đổi: "
+            f"{changed_fields}"
+        )
+    )
 
     return stadium
 
@@ -183,10 +231,13 @@ def delete_stadium(
         require_permission("STADIUM_DELETE")
     )
 ):
-
-    stadium = db.query(Stadium).filter(
-        Stadium.id == stadium_id
-    ).first()
+    stadium = (
+        db.query(Stadium)
+        .filter(
+            Stadium.id == stadium_id
+        )
+        .first()
+    )
 
     if not stadium:
         raise HTTPException(
@@ -194,8 +245,18 @@ def delete_stadium(
             detail="Không tìm thấy nhà thi đấu"
         )
 
-    # Không cho xóa nếu còn khu vực trực thuộc.
-    # Tránh xóa dây chuyền dữ liệu hall/schedule/prediction...
+    # =================================================
+    # KHÔNG CHO XÓA NẾU CÒN HALL
+    # =================================================
+    #
+    # Tránh xóa dây chuyền:
+    # Stadium
+    #   ↓
+    # Hall
+    #   ↓
+    # Schedule / Prediction / Equipment...
+    # =================================================
+
     if stadium.halls:
         raise HTTPException(
             status_code=400,
@@ -206,8 +267,27 @@ def delete_stadium(
             )
         )
 
+    # Lưu thông tin trước khi xóa
+    deleted_stadium_id = stadium.id
+    deleted_stadium_name = stadium.name
+
     db.delete(stadium)
     db.commit()
+
+    # =================================================
+    # ACTIVITY LOG
+    # =================================================
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="DELETE_STADIUM",
+        target=f"stadium:{deleted_stadium_id}",
+        description=(
+            f"Xóa nhà thi đấu: "
+            f"{deleted_stadium_name}"
+        )
+    )
 
     return {
         "message": "Xóa nhà thi đấu thành công"

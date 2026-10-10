@@ -10,7 +10,9 @@ from routers import (
     bookings,
     users,
     activity_logs,
-    predictions
+    predictions,
+    ml_data,
+    reports
 )
 
 
@@ -76,6 +78,10 @@ app.include_router(activity_logs.router)
 
 # Dự đoán
 app.include_router(predictions.router)
+
+app.include_router(ml_data.router)
+
+app.include_router(reports.router)
 
 # =====================================================
 # API KIỂM TRA BACKEND

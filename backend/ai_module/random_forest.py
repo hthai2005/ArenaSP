@@ -86,15 +86,16 @@ def build_training_dataset(
         )
 
     schedules = (
-        db.query(Schedule)
-        .filter(
-            Schedule.status != "CANCELLED"
-        )
-        .order_by(
-            Schedule.start_time.asc()
-        )
-        .all()
+    db.query(Schedule)
+    .filter(
+        Schedule.status == "COMPLETED",
+        Schedule.end_time < datetime.now()
     )
+    .order_by(
+        Schedule.start_time.asc()
+    )
+    .all()
+)
 
     if not schedules:
         raise ValueError(

@@ -8,6 +8,7 @@ from fastapi import (
 
 from sqlalchemy.orm import Session
 
+from activity_logger import write_activity_log
 from database import get_db
 
 from models import (
@@ -43,16 +44,19 @@ router = APIRouter(
 def generate_equipment_code(
     db: Session
 ):
-
     number = 1
 
     while True:
 
         code = f"TB-{number:02d}"
 
-        existing = db.query(Equipment).filter(
-            Equipment.code == code
-        ).first()
+        existing = (
+            db.query(Equipment)
+            .filter(
+                Equipment.code == code
+            )
+            .first()
+        )
 
         if not existing:
             return code
@@ -62,7 +66,7 @@ def generate_equipment_code(
 
 # =====================================================
 # LẤY DANH SÁCH THIẾT BỊ
-# Có thể lọc theo hall_id
+# Có thể lọc theo hallId
 # =====================================================
 
 @router.get(
@@ -71,7 +75,8 @@ def generate_equipment_code(
 )
 def get_equipments(
     hall_id: int | None = Query(
-        default=None
+        default=None,
+        alias="hallId"
     ),
 
     db: Session = Depends(get_db),
@@ -80,7 +85,6 @@ def get_equipments(
         require_permission("EQUIPMENT_VIEW")
     )
 ):
-
     query = db.query(Equipment)
 
     if hall_id is not None:
@@ -115,10 +119,13 @@ def get_equipment(
         require_permission("EQUIPMENT_VIEW")
     )
 ):
-
-    equipment = db.query(Equipment).filter(
-        Equipment.id == equipment_id
-    ).first()
+    equipment = (
+        db.query(Equipment)
+        .filter(
+            Equipment.id == equipment_id
+        )
+        .first()
+    )
 
     if not equipment:
 
@@ -148,6 +155,7 @@ def create_equipment(
         require_permission("EQUIPMENT_CREATE")
     )
 ):
+    hall = None
 
     # -------------------------------------------------
     # Nếu có hall_id thì kiểm tra hall tồn tại
@@ -156,9 +164,13 @@ def create_equipment(
 
     if data.hall_id is not None:
 
-        hall = db.query(Hall).filter(
-            Hall.id == data.hall_id
-        ).first()
+        hall = (
+            db.query(Hall)
+            .filter(
+                Hall.id == data.hall_id
+            )
+            .first()
+        )
 
         if not hall:
 
@@ -183,9 +195,13 @@ def create_equipment(
     # Kiểm tra code trùng
     # -------------------------------------------------
 
-    existing_code = db.query(Equipment).filter(
-        Equipment.code == code
-    ).first()
+    existing_code = (
+        db.query(Equipment)
+        .filter(
+            Equipment.code == code
+        )
+        .first()
+    )
 
     if existing_code:
 
@@ -212,6 +228,29 @@ def create_equipment(
     db.commit()
     db.refresh(new_equipment)
 
+    # -------------------------------------------------
+    # ACTIVITY LOG
+    # -------------------------------------------------
+
+    hall_name = (
+        hall.name
+        if hall
+        else "Khu kỹ thuật chung"
+    )
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="CREATE_EQUIPMENT",
+        target=f"equipment:{new_equipment.id}",
+        description=(
+            f"Tạo thiết bị "
+            f"{new_equipment.code} - "
+            f"{new_equipment.name}. "
+            f"Khu vực: {hall_name}"
+        )
+    )
+
     return new_equipment
 
 
@@ -234,10 +273,13 @@ def update_equipment(
         require_permission("EQUIPMENT_UPDATE")
     )
 ):
-
-    equipment = db.query(Equipment).filter(
-        Equipment.id == equipment_id
-    ).first()
+    equipment = (
+        db.query(Equipment)
+        .filter(
+            Equipment.id == equipment_id
+        )
+        .first()
+    )
 
     if not equipment:
 
@@ -245,6 +287,10 @@ def update_equipment(
             status_code=404,
             detail="Không tìm thấy thiết bị"
         )
+
+    # Lưu thông tin cũ để ghi log
+    old_code = equipment.code
+    old_name = equipment.name
 
     update_data = data.model_dump(
         exclude_unset=True
@@ -260,9 +306,13 @@ def update_equipment(
         and update_data["hall_id"] is not None
     ):
 
-        hall = db.query(Hall).filter(
-            Hall.id == update_data["hall_id"]
-        ).first()
+        hall = (
+            db.query(Hall)
+            .filter(
+                Hall.id == update_data["hall_id"]
+            )
+            .first()
+        )
 
         if not hall:
 
@@ -279,7 +329,10 @@ def update_equipment(
 
         code = update_data["code"]
 
-        if code is None or not code.strip():
+        if (
+            code is None
+            or not code.strip()
+        ):
 
             raise HTTPException(
                 status_code=400,
@@ -288,10 +341,14 @@ def update_equipment(
 
         code = code.strip()
 
-        existing_code = db.query(Equipment).filter(
-            Equipment.code == code,
-            Equipment.id != equipment_id
-        ).first()
+        existing_code = (
+            db.query(Equipment)
+            .filter(
+                Equipment.code == code,
+                Equipment.id != equipment_id
+            )
+            .first()
+        )
 
         if existing_code:
 
@@ -303,7 +360,7 @@ def update_equipment(
         update_data["code"] = code
 
     # -------------------------------------------------
-    # Cập nhật
+    # Cập nhật dữ liệu
     # -------------------------------------------------
 
     for field, value in update_data.items():
@@ -316,6 +373,27 @@ def update_equipment(
 
     db.commit()
     db.refresh(equipment)
+
+    # -------------------------------------------------
+    # ACTIVITY LOG
+    # -------------------------------------------------
+
+    changed_fields = ", ".join(
+        update_data.keys()
+    )
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="UPDATE_EQUIPMENT",
+        target=f"equipment:{equipment.id}",
+        description=(
+            f"Cập nhật thiết bị "
+            f"{old_code} - {old_name}. "
+            f"Trường thay đổi: "
+            f"{changed_fields}"
+        )
+    )
 
     return equipment
 
@@ -336,10 +414,13 @@ def delete_equipment(
         require_permission("EQUIPMENT_DELETE")
     )
 ):
-
-    equipment = db.query(Equipment).filter(
-        Equipment.id == equipment_id
-    ).first()
+    equipment = (
+        db.query(Equipment)
+        .filter(
+            Equipment.id == equipment_id
+        )
+        .first()
+    )
 
     if not equipment:
 
@@ -348,8 +429,32 @@ def delete_equipment(
             detail="Không tìm thấy thiết bị"
         )
 
+    # -------------------------------------------------
+    # Lưu thông tin trước khi xóa
+    # -------------------------------------------------
+
+    deleted_equipment_id = equipment.id
+    deleted_equipment_code = equipment.code
+    deleted_equipment_name = equipment.name
+
     db.delete(equipment)
     db.commit()
+
+    # -------------------------------------------------
+    # ACTIVITY LOG
+    # -------------------------------------------------
+
+    write_activity_log(
+        db=db,
+        user_id=current_user.id,
+        action="DELETE_EQUIPMENT",
+        target=f"equipment:{deleted_equipment_id}",
+        description=(
+            f"Xóa thiết bị "
+            f"{deleted_equipment_code} - "
+            f"{deleted_equipment_name}"
+        )
+    )
 
     return {
         "message": "Xóa thiết bị thành công"
