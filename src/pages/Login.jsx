@@ -8,14 +8,18 @@ export default function Login() {
   const [email, setEmail] = useState('admin@arenasp.vn')
   const [password, setPassword] = useState('123456')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
   if (user) {
     return <Navigate to={user.role === 'user' ? '/portal' : '/'} replace />
   }
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault()
-    const res = login(email, password)
+    setLoading(true)
+    setError('')
+    const res = await login(email, password)
+    setLoading(false)
     if (!res.ok) {
       setError(res.message)
       return
@@ -60,7 +64,9 @@ export default function Login() {
             </label>
             <span className="muted">Quên mật khẩu?</span>
           </div>
-          <button className="btn primary block" type="submit">Đăng nhập →</button>
+          <button className="btn primary block" type="submit" disabled={loading}>
+            {loading ? 'Đang đăng nhập...' : 'Đăng nhập →'}
+          </button>
         </form>
         <div className="demo-box">
           <p>Tài khoản demo tuần 3</p>

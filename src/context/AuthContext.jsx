@@ -1,11 +1,15 @@
 import { createContext, useContext, useState } from 'react'
-import { USERS } from '../data/mock'
+import { api, getToken, mapAppUser, setToken } from '../api/client'
 
 const AuthContext = createContext(null)
 const STORAGE_KEY = 'arenasp-user'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
+    if (!getToken()) {
+      localStorage.removeItem(STORAGE_KEY)
+      return null
+    }
     try {
       return JSON.parse(localStorage.getItem(STORAGE_KEY)) || null
     } catch {
@@ -13,50 +17,47 @@ export function AuthProvider({ children }) {
     }
   })
 
-  const readExtraUsers = () => {
+  const persist = (next) => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    setUser(next)
+  }
+
+  const login = async (email, password) => {
     try {
-      return JSON.parse(localStorage.getItem('arenasp-extra-users')) || []
-    } catch {
-      return []
+      const data = await api('/api/auth/login', {
+        method: 'POST',
+        auth: false,
+        body: { username: email.trim(), password },
+      })
+      setToken(data.access_token)
+      const mapped = mapAppUser(data.user)
+      persist(mapped)
+      return { ok: true, role: mapped.role }
+    } catch (err) {
+      return { ok: false, message: err.message }
     }
   }
 
-  const login = (email, password) => {
-    const all = [...USERS, ...readExtraUsers()]
-    const found = all.find(
-      (u) => u.email.toLowerCase() === email.trim().toLowerCase() && u.password === password,
-    )
-    if (!found) return { ok: false, message: 'Email hoặc mật khẩu không đúng.' }
-    const safe = { ...found }
-    delete safe.password
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(safe))
-    setUser(safe)
-    return { ok: true, role: safe.role }
-  }
-
-  const register = (payload) => {
-    const all = [...USERS, ...readExtraUsers()]
-    if (all.some((u) => u.email.toLowerCase() === payload.email.toLowerCase())) {
-      return { ok: false, message: 'Email đã được đăng ký.' }
+  const register = async (payload) => {
+    try {
+      await api('/api/auth/register', {
+        method: 'POST',
+        auth: false,
+        body: {
+          fullName: payload.name,
+          email: payload.email,
+          phone: payload.phone,
+          password: payload.password,
+        },
+      })
+      return login(payload.email, payload.password)
+    } catch (err) {
+      return { ok: false, message: err.message }
     }
-    const next = {
-      id: Date.now(),
-      name: payload.name,
-      email: payload.email,
-      password: payload.password,
-      role: 'user',
-      title: 'Đơn vị sử dụng',
-    }
-    const list = [...extraUsers, next]
-    localStorage.setItem('arenasp-extra-users', JSON.stringify(list))
-    const safe = { ...next }
-    delete safe.password
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(safe))
-    setUser(safe)
-    return { ok: true }
   }
 
   const logout = () => {
+    setToken(null)
     localStorage.removeItem(STORAGE_KEY)
     setUser(null)
   }

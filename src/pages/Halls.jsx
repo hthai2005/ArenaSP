@@ -41,15 +41,19 @@ export default function Halls() {
     setOpen(true)
   }
 
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault()
     if (!form.name.trim()) return setError('Tên hội trường không được trống.')
     if (!form.stadiumId) return setError('Vui lòng chọn nhà thi đấu.')
     if (Number(form.capacity) <= 0) return setError('Sức chứa phải lớn hơn 0.')
     const payload = { ...form, stadiumId: Number(form.stadiumId), capacity: Number(form.capacity) }
-    if (editing) updateHall(editing.id, payload)
-    else addHall(payload)
-    setOpen(false)
+    try {
+      if (editing) await updateHall(editing.id, payload)
+      else await addHall(payload)
+      setOpen(false)
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   if (user.role === 'user') {
@@ -75,6 +79,7 @@ export default function Halls() {
 
   return (
     <>
+      {error && !open ? <div className="alert danger">{error}</div> : null}
       <div className="stats compact">
         <article className="stat"><span>Tổng hội trường</span><strong>{halls.length}</strong></article>
         <article className="stat"><span>Đang hoạt động</span><strong>{halls.filter((h) => h.status === 'active').length}</strong></article>
@@ -132,7 +137,19 @@ export default function Halls() {
                   {canEdit ? (
                     <td className="actions">
                       <button type="button" onClick={() => { setEditing(h); setForm(h); setOpen(true) }}>Sửa</button>
-                      <button type="button" className="danger-text" onClick={() => removeHall(h.id)}>Xóa</button>
+                      <button
+                        type="button"
+                        className="danger-text"
+                        onClick={async () => {
+                          try {
+                            await removeHall(h.id)
+                          } catch (err) {
+                            setError(err.message)
+                          }
+                        }}
+                      >
+                        Xóa
+                      </button>
                     </td>
                   ) : null}
                 </tr>

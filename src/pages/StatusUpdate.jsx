@@ -13,34 +13,49 @@ export default function StatusUpdate() {
   const [status, setStatus] = useState('active')
   const [note, setNote] = useState('')
   const [ok, setOk] = useState('')
+  const [error, setError] = useState('')
 
   useEffect(() => {
     setMeta({ title: 'Ghi nhận & cập nhật tình trạng sân bãi – thiết bị trong ngày', crumbs: 'Trang chủ · Vận hành sân bãi' })
   }, [setMeta])
 
+  useEffect(() => {
+    const list = kind === 'hall' ? halls : equipment
+    if (!list.some((item) => item.id === Number(targetId))) {
+      setTargetId(list[0]?.id || '')
+    }
+  }, [kind, halls, equipment, targetId])
+
   const options = kind === 'hall' ? halls : equipment
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     if (!targetId) return
-    if (kind === 'hall') updateHall(Number(targetId), { status })
-    else updateEquipment(Number(targetId), { status })
-    const target = options.find((o) => o.id === Number(targetId))
-    addLog({
-      target: target?.name,
-      status,
-      note,
-      at: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
-      by: user.name,
-    })
-    setNote('')
-    setOk('Đã cập nhật trạng thái.')
+    try {
+      if (kind === 'hall') await updateHall(Number(targetId), { status })
+      else await updateEquipment(Number(targetId), { status })
+      const target = options.find((o) => o.id === Number(targetId))
+      addLog({
+        target: target?.name,
+        status,
+        note,
+        at: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        by: user.name,
+      })
+      setNote('')
+      setError('')
+      setOk('Đã cập nhật trạng thái.')
+    } catch (err) {
+      setOk('')
+      setError(err.message)
+    }
   }
 
   return (
     <div className="split-page">
       <form className="card form" onSubmit={submit}>
         {ok ? <div className="alert success">{ok}</div> : null}
+        {error ? <div className="alert danger">{error}</div> : null}
         <h3>1. Chọn đối tượng cần cập nhật</h3>
         <div className="choice">
           <button type="button" className={kind === 'hall' ? 'on' : ''} onClick={() => setKind('hall')}>Hội trường & sân thi đấu</button>

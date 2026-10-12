@@ -15,6 +15,7 @@ export default function Equipment() {
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(empty)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     setMeta({ title: 'Danh mục trang thiết bị & hệ thống kỹ thuật', crumbs: 'Trang chủ · Thiết bị' })
@@ -23,16 +24,22 @@ export default function Equipment() {
   const hallName = (id) => halls.find((h) => h.id === Number(id))?.name || 'Khu kỹ thuật chung'
   const canEdit = user.role === 'admin'
 
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault()
     const payload = { ...form, hallId: form.hallId ? Number(form.hallId) : null, quantity: Number(form.quantity) }
-    if (editing) updateEquipment(editing.id, payload)
-    else addEquipment(payload)
-    setOpen(false)
+    try {
+      if (editing) await updateEquipment(editing.id, payload)
+      else await addEquipment(payload)
+      setOpen(false)
+      setError('')
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   return (
     <>
+      {error && !open ? <div className="alert danger">{error}</div> : null}
       <div className="stats compact">
         <article className="stat"><span>Tổng thiết bị</span><strong>{equipment.length}</strong></article>
         <article className="stat"><span>Đang hoạt động</span><strong>{equipment.filter((e) => e.status === 'active').length}</strong></article>
@@ -74,7 +81,19 @@ export default function Equipment() {
                 {canEdit ? (
                   <td className="actions">
                     <button type="button" onClick={() => { setEditing(item); setForm({ ...item, hallId: item.hallId || '' }); setOpen(true) }}>Sửa</button>
-                    <button type="button" className="danger-text" onClick={() => removeEquipment(item.id)}>Xóa</button>
+                    <button
+                      type="button"
+                      className="danger-text"
+                      onClick={async () => {
+                        try {
+                          await removeEquipment(item.id)
+                        } catch (err) {
+                          setError(err.message)
+                        }
+                      }}
+                    >
+                      Xóa
+                    </button>
                   </td>
                 ) : null}
               </tr>
@@ -85,6 +104,7 @@ export default function Equipment() {
 
       <Modal open={open} onClose={() => setOpen(false)} title={editing ? 'Sửa thiết bị' : 'Thêm thiết bị mới'}>
         <form className="form" onSubmit={save}>
+          {error ? <div className="alert danger">{error}</div> : null}
           <label>
             Tên thiết bị *
             <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />

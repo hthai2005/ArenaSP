@@ -18,11 +18,12 @@ export default function Register() {
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
-  const onSubmit = (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault()
     if (form.password.length < 6) return setError('Mật khẩu tối thiểu 6 ký tự.')
     if (form.password !== form.confirm) return setError('Xác nhận mật khẩu không khớp.')
-    const res = register(form)
+    setError('')
+    const res = await register(form)
     if (!res.ok) return setError(res.message)
     navigate('/portal')
   }

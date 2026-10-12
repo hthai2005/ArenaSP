@@ -45,24 +45,33 @@ export default function Stadiums() {
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }))
 
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault()
     if (!form.name.trim() || !form.address.trim()) {
       setError('Vui lòng nhập tên và địa chỉ nhà thi đấu.')
       return
     }
     const payload = {
-      ...form,
+      name: form.name,
+      officialName: form.officialName,
+      address: form.address,
       area: Number(form.area || 0),
       capacity: Number(form.capacity || 0),
+      description: form.description,
+      status: form.status,
     }
-    if (editing) updateStadium(editing.id, payload)
-    else addStadium(payload)
-    setOpen(false)
+    try {
+      if (editing) await updateStadium(editing.id, payload)
+      else await addStadium(payload)
+      setOpen(false)
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   return (
     <>
+      {error && !open ? <div className="alert danger">{error}</div> : null}
       <div className="toolbar">
         <p className="muted">Đăng ký hồ sơ cơ sở thể thao vào hệ thống tỉnh.</p>
         {user.role === 'admin' ? (
@@ -98,7 +107,19 @@ export default function Stadiums() {
                 <td className="actions">
                   <button type="button" onClick={() => openEdit(s)}>Sửa</button>
                   {user.role === 'admin' ? (
-                    <button type="button" className="danger-text" onClick={() => removeStadium(s.id)}>Xóa</button>
+                    <button
+                      type="button"
+                      className="danger-text"
+                      onClick={async () => {
+                        try {
+                          await removeStadium(s.id)
+                        } catch (err) {
+                          setError(err.message)
+                        }
+                      }}
+                    >
+                      Xóa
+                    </button>
                   ) : null}
                 </td>
               </tr>
