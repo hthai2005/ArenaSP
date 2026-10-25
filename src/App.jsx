@@ -2,13 +2,18 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './context/AuthContext'
 import AppLayout from './layouts/AppLayout'
+import AIAssistant from './pages/AIAssistant'
+import BookingForm from './pages/BookingForm'
+import BookingSimpleForm from './pages/BookingSimpleForm'
 import Dashboard from './pages/Dashboard'
 import Equipment from './pages/Equipment'
 import Forbidden from './pages/Forbidden'
 import Halls from './pages/Halls'
 import Login from './pages/Login'
+import MyBookings from './pages/MyBookings'
 import Portal from './pages/Portal'
 import Register from './pages/Register'
+import ScheduleView from './pages/ScheduleView'
 import Stadiums from './pages/Stadiums'
 import StatusUpdate from './pages/StatusUpdate'
 
@@ -70,6 +75,32 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/schedule" element={<ScheduleView />} />
+        <Route
+          path="/my-bookings"
+          element={
+            <ProtectedRoute roles={['user']}>
+              <MyBookings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/booking/simple"
+          element={
+            <ProtectedRoute roles={['user']}>
+              <BookingSimpleForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/booking/new"
+          element={
+            <ProtectedRoute roles={['user']}>
+              <BookingForm />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/ai-assistant" element={<AIAssistant />} />
         <Route path="/403" element={<Forbidden />} />
       </Route>
       <Route path="*" element={<Fallback />} />

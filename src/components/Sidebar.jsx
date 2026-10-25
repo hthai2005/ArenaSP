@@ -1,12 +1,13 @@
 import {
+  Bot,
   Building2,
   CalendarDays,
   CircuitBoard,
+  ClipboardList,
   LayoutDashboard,
   LogOut,
-  MessageSquare,
+  PlusCircle,
   ShieldAlert,
-  Sparkles,
   Warehouse,
 } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
@@ -20,9 +21,11 @@ const ITEMS = [
   { to: '/halls', label: 'Hội trường & sân', icon: Building2, roles: ['admin', 'staff', 'user'] },
   { to: '/equipment', label: 'Thiết bị', icon: CircuitBoard, roles: ['admin', 'staff'] },
   { to: '/status', label: 'Cập nhật tình trạng', icon: ShieldAlert, roles: ['staff'] },
-  { to: '/coming/schedule', label: 'Lịch & đặt chỗ', icon: CalendarDays, later: true, roles: ['admin', 'staff', 'user'] },
-  { to: '/coming/rf', label: 'Dự báo RF', icon: Sparkles, later: true, roles: ['admin'] },
-  { to: '/coming/ai', label: 'Trợ lý AI', icon: MessageSquare, later: true, roles: ['admin', 'staff', 'user'] },
+  { to: '/schedule', label: 'Tra cứu lịch', icon: CalendarDays, roles: ['admin', 'staff', 'user'] },
+  { to: '/my-bookings', label: 'Đơn đăng ký', icon: ClipboardList, roles: ['user'] },
+  { to: '/booking/simple', label: 'Đăng ký hội trường', icon: PlusCircle, roles: ['user'] },
+  { to: '/booking/new', label: 'Đăng ký nâng cao', icon: PlusCircle, roles: ['user'] },
+  { to: '/ai-assistant', label: 'Trợ lý AI', icon: Bot, roles: ['admin', 'staff', 'user'] },
 ]
 
 export default function Sidebar() {
@@ -42,15 +45,6 @@ export default function Sidebar() {
       <nav>
         {items.map((item) => {
           const Icon = item.icon
-          if (item.later) {
-            return (
-              <div key={item.to} className="nav-item later" title="Sẽ mở ở tuần sau">
-                <Icon size={18} />
-                <span>{item.label}</span>
-                <em>Tuần sau</em>
-              </div>
-            )
-          }
           return (
             <NavLink key={item.to} to={item.to} end={item.to === '/'} className="nav-item">
               <Icon size={18} />
