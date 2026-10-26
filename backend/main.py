@@ -12,7 +12,8 @@ from routers import (
     activity_logs,
     predictions,
     ml_data,
-    reports
+    reports,
+    assistant
 )
 
 
@@ -82,6 +83,9 @@ app.include_router(predictions.router)
 app.include_router(ml_data.router)
 
 app.include_router(reports.router)
+
+# Trợ lý AI
+app.include_router(assistant.router)
 
 # =====================================================
 # API KIỂM TRA BACKEND

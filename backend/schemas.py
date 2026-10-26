@@ -448,7 +448,10 @@ class BookingCreate(APIModel):
 
     end_time: datetime
 
-    note: str | None = None
+    note: str | None = Field(
+        None,
+        validation_alias=AliasChoices("note", "description")
+    )
 
     @model_validator(mode="after")
     def validate_time(self):
@@ -648,4 +651,36 @@ class DailyOccupancyResponse(APIModel):
     usage_minutes: float
     available_minutes: float
     usage_percent: float
+
+
+# =====================================================
+# TRỢ LÝ AI / ASSISTANT CHAT
+# =====================================================
+
+class AssistantChatRequest(APIModel):
+    message: str
+    hall_id: int | None = None
+    target_date: str | None = None
+
+
+class AssistantSlot(APIModel):
+    time: str
+    status: str
+    load: str
+    statusColor: str
+
+
+class AssistantExplainColumn(APIModel):
+    icon: str
+    title: str
+    desc: str
+
+
+class AssistantChatResponse(APIModel):
+    content: str = "text"
+    text: str | None = None
+    slots: list[AssistantSlot] | None = None
+    actions: list[str] | None = None
+    columns: list[AssistantExplainColumn] | None = None
+    forecast: str | None = None
 

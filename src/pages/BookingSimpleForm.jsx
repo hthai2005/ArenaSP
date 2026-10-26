@@ -409,18 +409,33 @@ export default function BookingSimpleForm() {
     setOk('')
     setError('')
 
-    if (
-      !form.hallId ||
-      !form.title.trim() ||
-      !form.date ||
-      !form.start ||
-      !form.end
-    ) {
+    if (!form.hallId) {
+      setError('Vui lòng chọn Hội trường / Sân ở Phần B.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
 
-      setError(
-        'Vui lòng nhập đầy đủ hội trường, tên sự kiện, ngày và thời gian.',
-      )
+    if (!form.title.trim()) {
+      setError('Vui lòng nhập "Tên sự kiện dự kiến" ở Phần A.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
 
+    if (!form.date) {
+      setError('Vui lòng chọn "Ngày sử dụng" ở Phần B.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
+    if (!form.start) {
+      setError('Vui lòng chọn "Giờ bắt đầu" ở Phần B.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+
+    if (!form.end) {
+      setError('Vui lòng chọn "Giờ kết thúc" ở Phần B.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
 
@@ -428,20 +443,13 @@ export default function BookingSimpleForm() {
       form.end <=
       form.start
     ) {
-
-      setError(
-        'Giờ kết thúc phải lớn hơn giờ bắt đầu.',
-      )
-
+      setError('Giờ kết thúc phải lớn hơn giờ bắt đầu.')
+      window.scrollTo({ top: 0, behavior: 'smooth' })
       return
     }
 
     if (!agreed) {
-
-      setError(
-        'Bạn cần đồng ý với điều khoản sử dụng hội trường.',
-      )
-
+      setError('Vui lòng tích chọn ô "Tôi đã đọc và đồng ý với các điều khoản sử dụng hội trường" ở cuối trang.')
       return
     }
 
@@ -1457,6 +1465,24 @@ export default function BookingSimpleForm() {
 
             </div>
 
+            {error ? (
+              <div
+                style={{
+                  color: '#dc2626',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  marginBottom: 10,
+                  textAlign: 'right',
+                  background: '#fef2f2',
+                  border: '1px solid #fecaca',
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                }}
+              >
+                ⚠️ {error}
+              </div>
+            ) : null}
+
             <div
               style={{
                 display:
@@ -1500,10 +1526,7 @@ export default function BookingSimpleForm() {
               <button
                 type="button"
                 className="btn primary"
-                disabled={
-                  !agreed ||
-                  submitting
-                }
+                disabled={submitting}
                 onClick={
                   submitBooking
                 }
