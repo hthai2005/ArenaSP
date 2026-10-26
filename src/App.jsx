@@ -3,6 +3,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './context/AuthContext'
 import AppLayout from './layouts/AppLayout'
 import AIAssistant from './pages/AIAssistant'
+import AdminUsers from './pages/AdminUsers'
 import BookingForm from './pages/BookingForm'
 import BookingSimpleForm from './pages/BookingSimpleForm'
 import Dashboard from './pages/Dashboard'
@@ -19,21 +20,42 @@ import StatusUpdate from './pages/StatusUpdate'
 
 function RoleHome() {
   const { user } = useAuth()
-  if (user.role === 'user') return <Navigate to="/portal" replace />
+
+  if (user.role === 'user') {
+    return <Navigate to="/portal" replace />
+  }
+
   return <Dashboard />
 }
 
 function Fallback() {
   const { user } = useAuth()
-  if (!user) return <Navigate to="/login" replace />
-  return <Navigate to={user.role === 'user' ? '/portal' : '/'} replace />
+
+  if (!user) {
+    return <Navigate to="/login" replace />
+  }
+
+  return (
+    <Navigate
+      to={user.role === 'user' ? '/portal' : '/'}
+      replace
+    />
+  )
 }
 
 export default function App() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+      <Route
+        path="/login"
+        element={<Login />}
+      />
+
+      <Route
+        path="/register"
+        element={<Register />}
+      />
+
       <Route
         element={
           <ProtectedRoute>
@@ -41,32 +63,70 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route path="/" element={<RoleHome />} />
+        <Route
+          path="/"
+          element={<RoleHome />}
+        />
+
+        <Route
+          path="/admin/users"
+          element={
+            <ProtectedRoute roles={['admin']}>
+              <AdminUsers />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/stadiums"
           element={
-            <ProtectedRoute roles={['admin']}>
+            <ProtectedRoute
+              roles={[
+                'admin',
+                'manager',
+                'staff',
+              ]}
+            >
               <Stadiums />
             </ProtectedRoute>
           }
         />
-        <Route path="/halls" element={<Halls />} />
+
+        <Route
+          path="/halls"
+          element={<Halls />}
+        />
+
         <Route
           path="/equipment"
           element={
-            <ProtectedRoute roles={['admin', 'staff']}>
+            <ProtectedRoute
+              roles={[
+                'admin',
+                'manager',
+                'staff',
+              ]}
+            >
               <Equipment />
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/status"
           element={
-            <ProtectedRoute roles={['staff']}>
+            <ProtectedRoute
+              roles={[
+                'admin',
+                'manager',
+                'staff',
+              ]}
+            >
               <StatusUpdate />
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/portal"
           element={
@@ -75,15 +135,17 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/schedule" element={<ScheduleView />} />
+
+        <Route
+          path="/schedule"
+          element={<ScheduleView />}
+        />
+
         <Route
           path="/my-bookings"
-          element={
-            <ProtectedRoute roles={['user']}>
-              <MyBookings />
-            </ProtectedRoute>
-          }
+          element={<MyBookings />}
         />
+
         <Route
           path="/booking/simple"
           element={
@@ -92,6 +154,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/booking/new"
           element={
@@ -100,10 +163,22 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route path="/ai-assistant" element={<AIAssistant />} />
-        <Route path="/403" element={<Forbidden />} />
+
+        <Route
+          path="/ai-assistant"
+          element={<AIAssistant />}
+        />
+
+        <Route
+          path="/403"
+          element={<Forbidden />}
+        />
       </Route>
-      <Route path="*" element={<Fallback />} />
+
+      <Route
+        path="*"
+        element={<Fallback />}
+      />
     </Routes>
   )
 }

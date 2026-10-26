@@ -68,12 +68,6 @@ export default function Login() {
             {loading ? 'Đang đăng nhập...' : 'Đăng nhập →'}
           </button>
         </form>
-        <div className="demo-box">
-          <p>Tài khoản demo tuần 3</p>
-          <code>admin@arenasp.vn / 123456</code>
-          <code>staff@arenasp.vn / 123456</code>
-          <code>user@arenasp.vn / 123456</code>
-        </div>
       </section>
     </div>
   )
