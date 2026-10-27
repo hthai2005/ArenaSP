@@ -95,6 +95,35 @@ function formatDuration(
   return `${hours} tiếng ${mins} phút`
 }
 
+function addMinutesToTime(time, minutes) {
+  if (!time) {
+    return ''
+  }
+
+  const [hour, minute] = time
+    .split(':')
+    .map(Number)
+
+  const total =
+    hour * 60 +
+    minute +
+    minutes
+
+  if (total >= 24 * 60) {
+    return '23:59'
+  }
+
+  const newHour =
+    Math.floor(
+      total / 60,
+    )
+
+  const newMinute =
+    total % 60
+
+  return `${String(newHour).padStart(2, '0')}:${String(newMinute).padStart(2, '0')}`
+}
+
 export default function BookingSimpleForm() {
   const setMeta =
     usePageMeta()
@@ -349,6 +378,52 @@ export default function BookingSimpleForm() {
       form.end,
     )
 
+  const invalidTime =
+    Boolean(
+      form.start &&
+      form.end,
+    ) &&
+    form.end <= form.start
+
+  const minimumEndTime =
+    form.start
+      ? addMinutesToTime(
+          form.start,
+          1,
+        )
+      : ''
+
+  function handleStartTimeChange(value) {
+
+    setForm(
+      (current) => {
+
+        let nextEnd =
+          current.end
+
+        if (
+          !nextEnd ||
+          nextEnd <= value
+        ) {
+
+          nextEnd =
+            addMinutesToTime(
+              value,
+              60,
+            )
+        }
+
+        return {
+          ...current,
+          start: value,
+          end: nextEnd,
+        }
+      },
+    )
+
+    setError('')
+  }
+
   function setField(
     key,
     value,
@@ -410,32 +485,67 @@ export default function BookingSimpleForm() {
     setError('')
 
     if (!form.hallId) {
-      setError('Vui lòng chọn Hội trường / Sân ở Phần B.')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setError(
+        'Vui lòng chọn Hội trường / Sân ở Phần B.',
+      )
+
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+
       return
     }
 
     if (!form.title.trim()) {
-      setError('Vui lòng nhập "Tên sự kiện dự kiến" ở Phần A.')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setError(
+        'Vui lòng nhập "Tên sự kiện dự kiến" ở Phần A.',
+      )
+
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+
       return
     }
 
     if (!form.date) {
-      setError('Vui lòng chọn "Ngày sử dụng" ở Phần B.')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setError(
+        'Vui lòng chọn "Ngày sử dụng" ở Phần B.',
+      )
+
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+
       return
     }
 
     if (!form.start) {
-      setError('Vui lòng chọn "Giờ bắt đầu" ở Phần B.')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setError(
+        'Vui lòng chọn "Giờ bắt đầu" ở Phần B.',
+      )
+
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+
       return
     }
 
     if (!form.end) {
-      setError('Vui lòng chọn "Giờ kết thúc" ở Phần B.')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setError(
+        'Vui lòng chọn "Giờ kết thúc" ở Phần B.',
+      )
+
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+
       return
     }
 
@@ -443,13 +553,25 @@ export default function BookingSimpleForm() {
       form.end <=
       form.start
     ) {
-      setError('Giờ kết thúc phải lớn hơn giờ bắt đầu.')
-      window.scrollTo({ top: 0, behavior: 'smooth' })
+
+      setError(
+        'Giờ kết thúc phải lớn hơn giờ bắt đầu.',
+      )
+
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth',
+      })
+
       return
     }
 
     if (!agreed) {
-      setError('Vui lòng tích chọn ô "Tôi đã đọc và đồng ý với các điều khoản sử dụng hội trường" ở cuối trang.')
+
+      setError(
+        'Vui lòng tích chọn ô "Tôi đã đọc và đồng ý với các điều khoản sử dụng hội trường" ở cuối trang.',
+      )
+
       return
     }
 
@@ -1257,8 +1379,7 @@ export default function BookingSimpleForm() {
                     form.start
                   }
                   onChange={(e) =>
-                    setField(
-                      'start',
+                    handleStartTimeChange(
                       e.target.value,
                     )
                   }
@@ -1277,12 +1398,16 @@ export default function BookingSimpleForm() {
                   value={
                     form.end
                   }
-                  onChange={(e) =>
+                  min={minimumEndTime}
+                  onChange={(e) => {
+
                     setField(
                       'end',
                       e.target.value,
                     )
-                  }
+
+                    setError('')
+                  }}
                 />
 
               </div>
@@ -1296,9 +1421,27 @@ export default function BookingSimpleForm() {
               }}
             >
 
-              <span className="badge badge-success">
-                Thời lượng: {formatDuration(duration)}
-              </span>
+              {invalidTime ? (
+                <span
+                  className="badge"
+                  style={{
+                    background:
+                      '#fef2f2',
+
+                    color:
+                      '#dc2626',
+
+                    border:
+                      '1px solid #fecaca',
+                  }}
+                >
+                  ⚠️ Thời gian không hợp lệ: giờ kết thúc phải sau giờ bắt đầu.
+                </span>
+              ) : (
+                <span className="badge badge-success">
+                  Thời lượng: {formatDuration(duration)}
+                </span>
+              )}
 
               <p
                 className="muted"
@@ -1438,6 +1581,7 @@ export default function BookingSimpleForm() {
                           }}
                         >
                           {eq.name}{' '}
+
                           {eq.quantity
                             ? `(SL: ${eq.quantity})`
                             : ''}
@@ -1468,15 +1612,32 @@ export default function BookingSimpleForm() {
             {error ? (
               <div
                 style={{
-                  color: '#dc2626',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  marginBottom: 10,
-                  textAlign: 'right',
-                  background: '#fef2f2',
-                  border: '1px solid #fecaca',
-                  padding: '8px 12px',
-                  borderRadius: 8,
+                  color:
+                    '#dc2626',
+
+                  fontSize:
+                    13,
+
+                  fontWeight:
+                    600,
+
+                  marginBottom:
+                    10,
+
+                  textAlign:
+                    'right',
+
+                  background:
+                    '#fef2f2',
+
+                  border:
+                    '1px solid #fecaca',
+
+                  padding:
+                    '8px 12px',
+
+                  borderRadius:
+                    8,
                 }}
               >
                 ⚠️ {error}
@@ -1526,7 +1687,10 @@ export default function BookingSimpleForm() {
               <button
                 type="button"
                 className="btn primary"
-                disabled={submitting}
+                disabled={
+                  submitting ||
+                  invalidTime
+                }
                 onClick={
                   submitBooking
                 }

@@ -166,9 +166,9 @@ export default function AIAssistant() {
 
   function handleActionClick(actionText) {
     if (actionText.includes('Mở lịch')) {
-      navigate('/schedules')
+      navigate('/schedule')
     } else if (actionText.includes('Đăng ký')) {
-      navigate('/bookings')
+      navigate('/booking/simple')
     } else {
       handleSend(actionText)
     }
