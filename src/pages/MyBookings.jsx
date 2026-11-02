@@ -1,4 +1,4 @@
-import {
+﻿import {
   useEffect,
   useMemo,
   useState,
@@ -21,18 +21,19 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { usePageMeta } from '../layouts/AppLayout'
+import { formatDate, formatTimeRange, getHallName } from '../utils/format'
 
 const STATUS_LABEL = {
-  PENDING:
+  pending:
     'Chờ Ban quản lý duyệt',
 
-  APPROVED:
+  approved:
     'Đã phê duyệt – Đã xếp lịch',
 
-  REJECTED:
+  rejected:
     'Bị từ chối',
 
-  CANCELLED:
+  cancelled:
     'Đã hủy',
 }
 
@@ -64,61 +65,7 @@ const CARD_CLS = {
     'cancelled',
 }
 
-function formatDate(value) {
-  if (!value) {
-    return '—'
-  }
 
-  return new Date(
-    value,
-  ).toLocaleDateString(
-    'vi-VN',
-  )
-}
-
-function formatTimeRange(
-  start,
-  end,
-) {
-  if (
-    !start ||
-    !end
-  ) {
-    return '—'
-  }
-
-  const startDate =
-    new Date(start)
-
-  const endDate =
-    new Date(end)
-
-  return (
-    `${startDate.toLocaleTimeString(
-      'vi-VN',
-      {
-        hour:
-          '2-digit',
-
-        minute:
-          '2-digit',
-      },
-    )}–` +
-    `${endDate.toLocaleTimeString(
-      'vi-VN',
-      {
-        hour:
-          '2-digit',
-
-        minute:
-          '2-digit',
-      },
-    )} ` +
-    `(${startDate.toLocaleDateString(
-      'vi-VN',
-    )})`
-  )
-}
 
 export default function MyBookings() {
   const setMeta =
@@ -133,6 +80,7 @@ export default function MyBookings() {
   const {
     bookings,
     halls,
+    hallById,
     refreshBookings,
     approveBooking,
     rejectBooking,
@@ -214,9 +162,7 @@ export default function MyBookings() {
               status,
 
               statusLabel:
-                STATUS_LABEL[
-                  booking.status
-                ] ||
+                STATUS_LABEL[status] ||
                 booking.status,
 
               sentAt:

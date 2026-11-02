@@ -1,6 +1,8 @@
-import {
+﻿import {
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 
@@ -19,6 +21,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { usePageMeta } from '../layouts/AppLayout'
+import { debounce } from '../utils/format'
 
 const EVENT_TYPES = [
   'Giải thi đấu chính thức',
@@ -438,6 +441,21 @@ export default function BookingSimpleForm() {
     )
   }
 
+  // Auto-save draft sau 800ms không gõ (debounce), tránh ghi localStorage mỗi keystroke
+  const debouncedSave = useRef(
+    debounce((data) => {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(data))
+        setDraftSavedAt(
+          new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+        )
+      } catch { /* quota exceeded - bỏ qua */ }
+    }, 800),
+  ).current
+
+  useEffect(() => {
+    debouncedSave(form)
+  }, [form, debouncedSave])
   function toggleEq(id) {
 
     setSelectedEquipment(

@@ -1,22 +1,25 @@
+﻿import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import { useAuth } from './context/AuthContext'
 import AppLayout from './layouts/AppLayout'
-import AIAssistant from './pages/AIAssistant'
-import AdminUsers from './pages/AdminUsers'
-import BookingForm from './pages/BookingForm'
-import BookingSimpleForm from './pages/BookingSimpleForm'
-import Dashboard from './pages/Dashboard'
-import Equipment from './pages/Equipment'
-import Forbidden from './pages/Forbidden'
-import Halls from './pages/Halls'
+// Login/Register load ngay (không cần auth, cần nhanh)
 import Login from './pages/Login'
-import MyBookings from './pages/MyBookings'
-import Portal from './pages/Portal'
 import Register from './pages/Register'
-import ScheduleView from './pages/ScheduleView'
-import Stadiums from './pages/Stadiums'
-import StatusUpdate from './pages/StatusUpdate'
+import Forbidden from './pages/Forbidden'
+// Các page nặng dùng lazy loading -> giảm initial bundle
+const AIAssistant       = lazy(() => import('./pages/AIAssistant'))
+const AdminUsers        = lazy(() => import('./pages/AdminUsers'))
+const BookingForm       = lazy(() => import('./pages/BookingForm'))
+const BookingSimpleForm = lazy(() => import('./pages/BookingSimpleForm'))
+const Dashboard         = lazy(() => import('./pages/Dashboard'))
+const Equipment         = lazy(() => import('./pages/Equipment'))
+const Halls             = lazy(() => import('./pages/Halls'))
+const MyBookings        = lazy(() => import('./pages/MyBookings'))
+const Portal            = lazy(() => import('./pages/Portal'))
+const ScheduleView      = lazy(() => import('./pages/ScheduleView'))
+const Stadiums          = lazy(() => import('./pages/Stadiums'))
+const StatusUpdate      = lazy(() => import('./pages/StatusUpdate'))
 
 function RoleHome() {
   const { user } = useAuth()
@@ -43,8 +46,17 @@ function Fallback() {
   )
 }
 
+function PageFallback() {
+  return (
+    <div style={{ padding: '40px 28px', color: 'var(--muted)', fontSize: 14 }}>
+      Đang tải trang...
+    </div>
+  )
+}
+
 export default function App() {
   return (
+    <Suspense fallback={<PageFallback />}>
     <Routes>
       <Route
         path="/login"
@@ -180,5 +192,7 @@ export default function App() {
         element={<Fallback />}
       />
     </Routes>
+    </Suspense>
   )
 }
+

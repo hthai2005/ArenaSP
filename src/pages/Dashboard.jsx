@@ -1,4 +1,4 @@
-import {
+﻿import {
   useEffect,
 } from 'react'
 
@@ -13,20 +13,7 @@ import { useAuth } from '../context/AuthContext'
 import { useData } from '../context/DataContext'
 import { usePageMeta } from '../layouts/AppLayout'
 import StatusBadge from '../components/StatusBadge'
-
-function formatDateTime(
-  value,
-) {
-  if (!value) {
-    return '—'
-  }
-
-  return new Date(
-    value,
-  ).toLocaleString(
-    'vi-VN',
-  )
-}
+import { formatDateTime, getHallName } from '../utils/format'
 
 export default function Dashboard() {
   const setMeta =

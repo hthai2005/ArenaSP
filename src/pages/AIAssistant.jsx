@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bot, Loader2, Plus, RefreshCw, Send, Zap } from 'lucide-react'
 import { usePageMeta } from '../layouts/AppLayout'
+import { uid } from '../utils/format'
 import { api } from '../api/client'
 
 // ── Quick suggestions & History ──────────────────────────────────────────
@@ -115,7 +116,7 @@ export default function AIAssistant() {
 
     const now = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
     const userMsg = {
-      id: Date.now(),
+      id: uid(),
       role: 'user',
       time: now,
       text: query,
@@ -132,7 +133,7 @@ export default function AIAssistant() {
       })
 
       const aiReply = {
-        id: Date.now() + 1,
+        id: uid(),
         role: 'ai',
         time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         content: res.content || 'text',
@@ -145,7 +146,7 @@ export default function AIAssistant() {
       setMessages((prev) => [...prev, aiReply])
     } catch (err) {
       const errorReply = {
-        id: Date.now() + 1,
+        id: uid(),
         role: 'ai',
         time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         content: 'text',
@@ -177,7 +178,7 @@ export default function AIAssistant() {
   function handleNewChat() {
     setMessages([
       {
-        id: Date.now(),
+        id: uid(),
         role: 'ai',
         time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         content: 'text',
@@ -460,3 +461,4 @@ export default function AIAssistant() {
     </div>
   )
 }
+
