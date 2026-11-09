@@ -17,6 +17,12 @@ from routers import (
 )
 
 
+from database import engine
+from models import Base
+
+# Tự động tạo các bảng mới nếu chưa tồn tại (ví dụ: chat_messages)
+Base.metadata.create_all(bind=engine)
+
 # =====================================================
 # KHỞI TẠO FASTAPI
 # =====================================================

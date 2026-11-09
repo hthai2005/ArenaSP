@@ -680,3 +680,53 @@ class ActivityLog(Base):
     )
 
     user = relationship("User")
+
+
+# =====================================================
+# CHAT MESSAGE (LƯU LỊCH SỬ CHAT TRỢ LÝ AI)
+# =====================================================
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    user_id = Column(
+        Integer,
+        ForeignKey(
+            "users.id",
+            ondelete="CASCADE"
+        ),
+        nullable=False
+    )
+
+    role = Column(
+        String(20),
+        nullable=False
+    )  # 'user' hoặc 'ai'
+
+    content_type = Column(
+        String(20),
+        default="text"
+    )  # 'text', 'table', 'explain'
+
+    text = Column(
+        Text,
+        nullable=True
+    )
+
+    extra_data = Column(
+        Text,
+        nullable=True
+    )  # JSON chứa slots, actions, columns, forecast...
+
+    created_at = Column(
+        DateTime,
+        server_default=func.now()
+    )
+
+    user = relationship("User")

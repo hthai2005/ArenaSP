@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Bot, Loader2, Plus, RefreshCw, Send, Zap } from 'lucide-react'
 import { usePageMeta } from '../layouts/AppLayout'
@@ -7,19 +7,22 @@ import { api } from '../api/client'
 
 // ── Quick suggestions & History ──────────────────────────────────────────
 const HISTORY = [
-  { id: 1, label: 'Hỏi lịch hội trường ngày 18/10', query: 'Chiều 18/10 nhà thi đấu chính còn trống không?' },
-  { id: 2, label: 'Quy trình xin cấp phép đặt sân...', query: 'Quy trình xin cấp phép đặt sân' },
-  { id: 3, label: 'Giải thích gợi ý Random Forest...', query: 'Vì sao hệ thống gợi ý khung giờ này?' },
-  { id: 4, label: 'Nội quy mượn trang thiết bị...', query: 'Nội quy mượn trang thiết bị' },
+  { id: 1, label: 'Sân nào đang trống hôm nay?', query: 'Hôm nay có những sân nào đang trống ở các khung giờ nào?' },
+  { id: 2, label: 'Hỏi lịch hội trường ngày 18/10', query: 'Chiều 18/10 nhà thi đấu chính còn trống không?' },
+  { id: 3, label: 'Quy trình xin cấp phép đặt sân...', query: 'Quy trình xin cấp phép đặt sân' },
+  { id: 4, label: 'Giải thích gợi ý Random Forest...', query: 'Vì sao hệ thống gợi ý khung giờ này?' },
+  { id: 5, label: 'Cảnh báo quá tải nhà thi đấu', query: 'Hôm nay có sân nào bị quá tải không?' },
 ]
 
 const QUICK_ACTIONS = [
+  'Sân nào đang trống?',
   'Gợi ý lịch trống',
   'Xem lịch trống',
   'Gửi đơn đăng ký',
   'Nội quy sử dụng sân',
   'Cảnh báo quá tải',
 ]
+
 
 const INITIAL_MESSAGES = [
   {
@@ -104,7 +107,20 @@ export default function AIAssistant() {
 
   useEffect(() => {
     setMeta({ title: 'Trợ lý AI', crumbs: 'Trợ lý Điều hành Sân bãi AI' })
+    // Tải lịch sử chat từ cơ sở dữ liệu
+    async function loadHistory() {
+      try {
+        const historyData = await api('/api/assistant/history')
+        if (historyData && historyData.length > 0) {
+          setMessages(historyData)
+        }
+      } catch (err) {
+        console.warn('Chưa tải được lịch sử chat:', err)
+      }
+    }
+    loadHistory()
   }, [setMeta])
+
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -168,25 +184,33 @@ export default function AIAssistant() {
   function handleActionClick(actionText) {
     if (actionText.includes('Mở lịch')) {
       navigate('/schedule')
-    } else if (actionText.includes('Đăng ký')) {
+    } else if (actionText.includes('Đăng ký') || actionText.includes('Đăng kí') || actionText.includes('Đặt sân')) {
       navigate('/booking/simple')
     } else {
       handleSend(actionText)
     }
   }
 
-  function handleNewChat() {
+
+  async function handleNewChat() {
+    try {
+      await api('/api/assistant/history', { method: 'DELETE' })
+    } catch (e) {
+      console.warn('Lỗi xóa lịch sử DB:', e)
+    }
+
     setMessages([
       {
         id: uid(),
         role: 'ai',
         time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
         content: 'text',
-        text: 'Xin chào! Tôi là **Trợ lý Điều hành Sân bãi AI (ArenaSP)**.\n\nTôi có thể giúp bạn kiểm tra lịch trống, phân tích mức tải từ mô hình Random Forest, hướng dẫn quy trình đặt sân hoặc tra cứu nội quy sử dụng nhà thi đấu. Vui lòng đặt câu hỏi hoặc chọn tác vụ nhanh bên dưới!',
-        actions: ['Gợi ý lịch trống', 'Xem lịch trống', 'Gửi đơn đăng ký'],
+        text: 'Xin chào! Tôi là **Trợ lý Điều hành Sân bãi AI (ArenaSP)**.\n\nTôi có thể giúp bạn kiểm tra lịch trống, tìm sân đang trống theo từng khung giờ, phân tích mức tải từ mô hình Random Forest, hướng dẫn quy trình đặt sân hoặc tra cứu nội quy sử dụng nhà thi đấu. Vui lòng đặt câu hỏi hoặc chọn tác vụ nhanh bên dưới!',
+        actions: ['Sân nào đang trống?', 'Gợi ý lịch trống', 'Xem lịch trống', 'Gửi đơn đăng ký'],
       },
     ])
   }
+
 
   return (
     <div className="ai-layout">

@@ -47,216 +47,107 @@ OPEN_MINUTES = (
 
 
 # =====================================================
-# TẠO FEATURES CHO RANDOM FOREST
+# TẠO FEATURES CHO RANDOM FOREST (THEO KHUNG GIỜ)
+# Features: [hall_id, capacity, weekday, month, is_weekend, hour_slot]
 # =====================================================
 
 def create_features(
     hall: Hall,
-    prediction_date: date
+    prediction_date: date,
+    hour_slot: int = 14
 ):
-
     weekday = prediction_date.weekday()
-
-    is_weekend = (
-        1 if weekday >= 5 else 0
-    )
+    is_weekend = 1 if weekday >= 5 else 0
 
     return [
         hall.id,
         hall.capacity,
         weekday,
         prediction_date.month,
-        is_weekend
+        is_weekend,
+        hour_slot
     ]
 
 
 # =====================================================
-# TẠO DATASET TỪ LỊCH SỬ SCHEDULE
+# TẠO DATASET TỪ LỊCH SỬ SCHEDULE (THEO KHUNG GIỜ)
 # =====================================================
 
 def build_training_dataset(
     db: Session
 ):
-
     halls = db.query(Hall).all()
 
     if not halls:
-        raise ValueError(
-            "Chưa có khu vực thi đấu để huấn luyện"
-        )
+        raise ValueError("Chưa có khu vực thi đấu để huấn luyện")
 
     schedules = (
-    db.query(Schedule)
-    .filter(
-        Schedule.status == "COMPLETED",
-        Schedule.end_time < datetime.now()
+        db.query(Schedule)
+        .filter(
+            Schedule.status == "COMPLETED",
+            Schedule.end_time < datetime.now()
+        )
+        .order_by(Schedule.start_time.asc())
+        .all()
     )
-    .order_by(
-        Schedule.start_time.asc()
-    )
-    .all()
-)
 
     if not schedules:
-        raise ValueError(
-            "Chưa có dữ liệu lịch sử để huấn luyện Random Forest"
-        )
+        raise ValueError("Chưa có dữ liệu lịch sử để huấn luyện Random Forest")
 
-    # -------------------------------------------------
-    # Xác định khoảng thời gian lịch sử
-    # -------------------------------------------------
+    min_date = min(schedule.start_time.date() for schedule in schedules)
+    max_date = max(schedule.end_time.date() for schedule in schedules)
 
-    min_date = min(
-        schedule.start_time.date()
-        for schedule in schedules
-    )
-
-    max_date = max(
-        schedule.end_time.date()
-        for schedule in schedules
-    )
-
-    # Chỉ lấy tối đa 365 ngày gần nhất
-    earliest_date = (
-        max_date - timedelta(days=364)
-    )
-
+    earliest_date = max_date - timedelta(days=364)
     if min_date < earliest_date:
         min_date = earliest_date
 
-    # -------------------------------------------------
-    # Tính tổng số phút sử dụng mỗi hall / ngày
-    # -------------------------------------------------
+    # 6 khung giờ hoạt động chính của nhà thi đấu (mỗi slot 2 tiếng)
+    slots = [8, 10, 14, 16, 18, 20]
 
-    usage_minutes = defaultdict(float)
+    # Tính số phút hoạt động trong từng slot (hall_id, date, start_hour) -> minutes
+    slot_usage = defaultdict(float)
 
     for schedule in schedules:
-
-        current_date = (
-            schedule.start_time.date()
-        )
-
-        last_date = (
-            schedule.end_time.date()
-        )
+        current_date = schedule.start_time.date()
+        last_date = schedule.end_time.date()
 
         while current_date <= last_date:
+            for s_hour in slots:
+                slot_start = datetime.combine(current_date, time(s_hour, 0))
+                slot_end = slot_start + timedelta(hours=2)
 
-            day_open = datetime.combine(
-                current_date,
-                time(OPEN_HOUR, 0)
-            )
+                overlap_start = max(schedule.start_time, slot_start)
+                overlap_end = min(schedule.end_time, slot_end)
 
-            day_close = datetime.combine(
-                current_date,
-                time(CLOSE_HOUR, 0)
-            )
+                if overlap_end > overlap_start:
+                    mins = (overlap_end - overlap_start).total_seconds() / 60.0
+                    slot_usage[(schedule.hall_id, current_date, s_hour)] += mins
 
-            overlap_start = max(
-                schedule.start_time,
-                day_open
-            )
-
-            overlap_end = min(
-                schedule.end_time,
-                day_close
-            )
-
-            if overlap_end > overlap_start:
-
-                minutes = (
-                    overlap_end
-                    - overlap_start
-                ).total_seconds() / 60
-
-                usage_minutes[
-                    (
-                        schedule.hall_id,
-                        current_date
-                    )
-                ] += minutes
-
-            current_date += timedelta(
-                days=1
-            )
-
-    # -------------------------------------------------
-    # Tạo từng mẫu training
-    # -------------------------------------------------
+            current_date += timedelta(days=1)
 
     records = []
-
     for hall in halls:
-
         current_date = min_date
-
         while current_date <= max_date:
+            for s_hour in slots:
+                mins = slot_usage.get((hall.id, current_date, s_hour), 0.0)
+                usage_pct = min((mins / 120.0) * 100.0, 100.0)
 
-            minutes = usage_minutes.get(
-                (
-                    hall.id,
-                    current_date
-                ),
-                0
-            )
+                feat = create_features(hall, current_date, hour_slot=s_hour)
+                records.append((current_date, feat, usage_pct))
 
-            usage_percent = (
-                minutes
-                / OPEN_MINUTES
-                * 100
-            )
+            current_date += timedelta(days=1)
 
-            usage_percent = min(
-                usage_percent,
-                100
-            )
+    records.sort(key=lambda item: item[0])
 
-            records.append(
-                (
-                    current_date,
-                    create_features(
-                        hall,
-                        current_date
-                    ),
-                    usage_percent
-                )
-            )
+    if len(records) < 20:
+        raise ValueError("Cần ít nhất 20 mẫu dữ liệu lịch sử để huấn luyện Random Forest")
 
-            current_date += timedelta(
-                days=1
-            )
+    X = [r[1] for r in records]
+    y = [r[2] for r in records]
 
-    # -------------------------------------------------
-    # Sắp xếp theo ngày
-    # -------------------------------------------------
+    return X, y, min_date, max_date
 
-    records.sort(
-        key=lambda item: item[0]
-    )
-
-    if len(records) < 14:
-
-        raise ValueError(
-            "Cần ít nhất 14 mẫu dữ liệu lịch sử "
-            "để huấn luyện Random Forest"
-        )
-
-    X = [
-        record[1]
-        for record in records
-    ]
-
-    y = [
-        record[2]
-        for record in records
-    ]
-
-    return (
-        X,
-        y,
-        min_date,
-        max_date
-    )
 
 
 # =====================================================
@@ -391,36 +282,28 @@ def load_random_forest():
 
 
 # =====================================================
-# DỰ BÁO %
+# DỰ BÁO % THEO KHUNG GIỜ
 # =====================================================
 
 def predict_usage(
     hall: Hall,
-    prediction_date: date
+    prediction_date: date,
+    hour_slot: int = 14
 ):
-
     model_data = load_random_forest()
-
     model = model_data["model"]
 
     features = create_features(
         hall,
-        prediction_date
+        prediction_date,
+        hour_slot=hour_slot
     )
 
-    result = model.predict(
-        [features]
-    )[0]
+    result = model.predict([features])[0]
+    result = max(0, min(float(result), 100))
 
-    result = max(
-        0,
-        min(float(result), 100)
-    )
+    return round(result, 2)
 
-    return round(
-        result,
-        2
-    )
 
 
 # =====================================================

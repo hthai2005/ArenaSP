@@ -13,6 +13,8 @@ from ai_module.random_forest import (
     OPEN_HOUR,
     CLOSE_HOUR
 )
+from ai_module.gemini_assistant import get_system_context, call_gemini_assistant
+
 
 
 def extract_date_from_text(text: str) -> date:
@@ -82,14 +84,14 @@ def detect_hall(text: str, db: Session, fallback_hall_id: int | None = None) -> 
 
 
 def get_hall_slots_and_load(db: Session, hall: Hall, target_date: date) -> list[dict[str, Any]]:
-    """Tính toán trạng thái và % tải các khung giờ trong ngày cho một khu vực."""
+    """Tính toán trạng thái và % tải các khung giờ trong ngày cho một khu vực dựa trên Random Forest."""
     slots_def = [
-        ("08:00–10:00", 8, 10, False),
-        ("10:00–12:00", 10, 12, False),
-        ("14:00–16:00", 14, 16, False),
-        ("16:00–18:00", 16, 18, True),
-        ("18:00–20:00", 18, 20, True),
-        ("20:00–22:00", 20, 22, False),
+        ("08:00–10:00", 8, 10),
+        ("10:00–12:00", 10, 12),
+        ("14:00–16:00", 14, 16),
+        ("16:00–18:00", 16, 18),
+        ("18:00–20:00", 18, 20),
+        ("20:00–22:00", 20, 22),
     ]
 
     # Lấy các lịch trùng ngày
@@ -107,14 +109,8 @@ def get_hall_slots_and_load(db: Session, hall: Hall, target_date: date) -> list[
         if s.start_time.date() <= target_date <= s.end_time.date():
             day_schedules.append(s)
 
-    # Dự báo tải tổng quan từ Random Forest
-    try:
-        predicted_base = predict_usage(hall, target_date)
-    except Exception:
-        predicted_base = 35.0
-
     result = []
-    for time_str, s_hour, e_hour, is_peak in slots_def:
+    for time_str, s_hour, e_hour in slots_def:
         slot_start = datetime.combine(target_date, time(s_hour, 0))
         slot_end = datetime.combine(target_date, time(e_hour, 0))
 
@@ -132,24 +128,29 @@ def get_hall_slots_and_load(db: Session, hall: Hall, target_date: date) -> list[
                 "statusColor": "#dc2626"
             })
         else:
-            if is_peak or predicted_base > 50:
-                load_val = min(int(predicted_base * 1.1), 75)
+            # Dự báo trực tiếp theo slot bằng Random Forest
+            try:
+                predicted_slot_load = predict_usage(hall, target_date, hour_slot=s_hour)
+            except Exception:
+                predicted_slot_load = 30.0
+
+            if predicted_slot_load >= 50:
                 result.append({
                     "time": time_str,
                     "status": "Trống (tải trung bình)",
-                    "load": f"{load_val}%",
+                    "load": f"{int(predicted_slot_load)}%",
                     "statusColor": "#d97706"
                 })
             else:
-                load_val = max(int(predicted_base * 0.6), 18)
                 result.append({
                     "time": time_str,
                     "status": "Trống",
-                    "load": f"{load_val}%",
+                    "load": f"{int(predicted_slot_load)}%",
                     "statusColor": "#15803d"
                 })
 
     return result
+
 
 
 def process_assistant_query(
@@ -159,8 +160,9 @@ def process_assistant_query(
     target_date_str: str | None = None
 ) -> dict[str, Any]:
     """
-    Xử lý truy vấn trợ lý AI bằng cách phân loại ý định (Intent Classification),
-    kết hợp Knowledge Base và suy luận từ mô hình Random Forest.
+    Xử lý truy vấn trợ lý AI.
+    Ưu tiên sử dụng Gemini LLM nếu có cấu hình GEMINI_API_KEY.
+    Nếu không có KEY, tự động fallback về bộ phân loại intent cục bộ.
     """
     text = message.strip()
     text_lower = text.lower()
@@ -174,9 +176,104 @@ def process_assistant_query(
     else:
         target_date = extract_date_from_text(text)
 
+    # Ưu tiên gọi Gemini LLM nếu có GEMINI_API_KEY
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if gemini_key and gemini_key.strip():
+        try:
+            context = get_system_context(db, target_date)
+            gemini_res = call_gemini_assistant(text, context, gemini_key.strip())
+            if gemini_res:
+                return gemini_res
+        except Exception as e:
+            print("Lỗi fallback từ Gemini:", e)
+
     hall = detect_hall(text, db, hall_id)
     hall_name = hall.name if hall else "Nhà thi đấu"
     date_formatted = target_date.strftime("%d/%m/%Y")
+
+
+    # =========================================================================
+    # INTENT MỚI: TÌM SÂN NÀO ĐANG TRỐNG Ở KHUNG GIỜ NÀO (FIND AVAILABLE HALLS BY TIME)
+    # =========================================================================
+    if any(k in text_lower for k in [
+        "sân nào đang trống", "sân nào trống", "sân nào còn trống", "có sân nào trống",
+        "tìm sân trống", "sân nào rảnh", "khung giờ nào trống", "sân nào đặt được",
+        "những sân nào còn trống", "những sân nào trống"
+    ]):
+        all_active_halls = db.query(Hall).filter(Hall.status == "active").all()
+        slots_def = [
+            ("08:00–10:00", 8, 10),
+            ("10:00–12:00", 10, 12),
+            ("14:00–16:00", 14, 16),
+            ("16:00–18:00", 16, 18),
+            ("18:00–20:00", 18, 20),
+            ("20:00–22:00", 20, 22),
+        ]
+
+        # Kiểm tra người dùng có chỉ định giờ cụ thể không (vd: chiều, tối, sáng, 14h, 16h...)
+        target_hour = None
+        for h_cand in [8, 10, 14, 16, 18, 20]:
+            if f"{h_cand}h" in text_lower or f"{h_cand}:00" in text_lower:
+                target_hour = h_cand
+                break
+
+        # Lấy tất cả lịch trong ngày
+        schedules = (
+            db.query(Schedule)
+            .filter(Schedule.status != "CANCELLED")
+            .all()
+        )
+        day_schedules = [
+            s for s in schedules 
+            if s.start_time.date() <= target_date <= s.end_time.date()
+        ]
+
+        hall_availabilities = []
+        for h in all_active_halls:
+            free_slots = []
+            for time_str, s_hour, e_hour in slots_def:
+                if target_hour is not None and s_hour != target_hour:
+                    continue
+
+                slot_start = datetime.combine(target_date, time(s_hour, 0))
+                slot_end = datetime.combine(target_date, time(e_hour, 0))
+
+                occupied = any(
+                    s.hall_id == h.id and s.start_time < slot_end and s.end_time > slot_start
+                    for s in day_schedules
+                )
+
+                if not occupied:
+                    try:
+                        pred_load = predict_usage(h, target_date, hour_slot=s_hour)
+                    except Exception:
+                        pred_load = 30.0
+                    free_slots.append(f"{time_str} (dự báo tải: {int(pred_load)}%)")
+
+            if free_slots:
+                slots_text = ", ".join(free_slots)
+                hall_availabilities.append(
+                    f"- **{h.name}** ({h.code} - Sức chứa: {h.capacity:,} người):\n  👉 Khung giờ trống: {slots_text}"
+                )
+
+        if hall_availabilities:
+            response_text = (
+                f"### 🏟️ Danh sách sân còn trống ngày {date_formatted}:\n\n"
+                f"{chr(10).join(hall_availabilities)}\n\n"
+                f"💡 **Gợi ý từ Random Forest:** Các khung giờ có dự báo tải thấp (<50%) rất thích hợp để tập luyện hoặc tổ chức sự kiện tránh áp lực hạ tầng!"
+            )
+        else:
+            response_text = (
+                f"### ⚠️ Thông báo lịch ngày {date_formatted}:\n\n"
+                f"Hiện tại vào ngày {date_formatted}, tất cả các sân đều đã kín lịch trong khung giờ bạn yêu cầu. "
+                f"Bạn có thể chọn một ngày khác hoặc liên hệ bộ phận điều phối để kiểm tra hủy lịch đột xuất."
+            )
+
+        return {
+            "content": "text",
+            "text": response_text,
+            "actions": ["Gợi ý lịch trống", "Xem lịch trống", "Gửi đơn đăng ký"]
+        }
 
     # =========================================================================
     # INTENT 1: GIẢI THÍCH MÔ HÌNH RANDOM FOREST / TẠI SAO GỢI Ý (EXPLAIN CONTENT)
@@ -246,10 +343,32 @@ def process_assistant_query(
         }
 
     # =========================================================================
+    # INTENT ĐẶT CHỖ / ĐĂNG KÝ KHUNG GIỜ CỤ THỂ (BOOKING ACTION)
+    # =========================================================================
+    if any(k in text_lower for k in [
+        "đăng ký khung", "đăng kí khung", "đặt khung", "giữ khung", "đặt sân lúc", 
+        "thuê khung", "đăng ký sân", "đăng kí sân"
+    ]):
+        return {
+            "content": "text",
+            "text": (
+                f"### 📝 Xác nhận nhu cầu đăng ký giữ chỗ:\n\n"
+                f"Bạn đang có nhu cầu đặt khu vực **{hall_name}** vào ngày **{date_formatted}**.\n\n"
+                f"👉 Để đảm bảo tính chính xác và lưu hồ sơ cấp phép vào hệ thống, bạn hãy bấm vào nút **'Đến trang Đặt sân'** bên dưới để hoàn tất thông tin (mục đích sử dụng, số lượng người, trang thiết bị mượn kèm).\n\n"
+                f"Ban Quản lý sẽ nhận được đơn và duyệt trong thời gian sớm nhất!"
+            ),
+            "actions": [
+                "Đăng ký đặt sân ngay",
+                f"Mở lịch {hall.code if hall else ''}",
+                "Quy trình xin cấp phép"
+            ]
+        }
+
+    # =========================================================================
     # INTENT 3: QUY TRÌNH XIN CẤP PHÉP / GỬI ĐƠN ĐĂNG KÝ (PROCEDURE)
     # =========================================================================
     if any(k in text_lower for k in [
-        "gửi đơn", "đăng ký", "quy trình", "thủ tục", "xin cấp phép", "hồ sơ", "đặt sân"
+        "gửi đơn", "đăng ký", "đăng kí", "quy trình", "thủ tục", "xin cấp phép", "hồ sơ", "đặt sân"
     ]):
         return {
             "content": "text",
