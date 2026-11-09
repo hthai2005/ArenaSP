@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import Modal from '../components/Modal'
 import StatusBadge from '../components/StatusBadge'
 import { useAuth } from '../context/AuthContext'
@@ -9,6 +10,7 @@ import { usePageMeta } from '../layouts/AppLayout'
 const empty = { name: '', stadiumId: '', type: 'Hội trường', capacity: '', equipment: '', status: 'active' }
 
 export default function Halls() {
+  const navigate = useNavigate()
   const setMeta = usePageMeta()
   const { user } = useAuth()
   const { stadiums, halls, addHall, updateHall, removeHall } = useData()
@@ -67,8 +69,12 @@ export default function Halls() {
               <h3>{h.name}</h3>
               <p>{h.capacity.toLocaleString('vi-VN')} chỗ · {h.type}</p>
               <div className="row-gap">
-                <button className="btn ghost" type="button">Xem chi tiết</button>
-                <button className="btn" type="button" disabled title="Sắp ra mắt – tuần 4">Gửi yêu cầu đặt chỗ</button>
+                <button className="btn ghost" type="button" onClick={() => navigate(`/schedule?hallId=${h.id}`)}>
+                  Xem chi tiết
+                </button>
+                <button className="btn" type="button" onClick={() => navigate(`/booking/simple?hallId=${h.id}`)}>
+                  Gửi yêu cầu đặt chỗ
+                </button>
               </div>
             </div>
           </article>
