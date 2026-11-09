@@ -365,25 +365,6 @@ def process_assistant_query(
         }
 
     # =========================================================================
-    # INTENT 3: QUY TRÌNH XIN CẤP PHÉP / GỬI ĐƠN ĐĂNG KÝ (PROCEDURE)
-    # =========================================================================
-    if any(k in text_lower for k in [
-        "gửi đơn", "đăng ký", "đăng kí", "quy trình", "thủ tục", "xin cấp phép", "hồ sơ", "đặt sân"
-    ]):
-        return {
-            "content": "text",
-            "text": (
-                "### 📋 Quy trình xin cấp phép đặt sân & tổ chức sự kiện tại Nhà thi đấu Tỉnh:\n\n"
-                "1. **Bước 1 — Kiểm tra lịch trống:** Truy cập mục **Lịch hoạt động** hoặc tra cứu trực tiếp qua Trợ lý AI để chọn ngày và khung giờ mong muốn.\n"
-                "2. **Bước 2 — Tạo yêu cầu đặt chỗ:** Vào mục **Đặt chỗ (Bookings)** -> Chọn **Tạo yêu cầu mới**, điền thông tin đơn vị tổ chức, mục đích và số lượng người tham dự.\n"
-                "3. **Bước 3 — Nộp hồ sơ bổ sung (nếu có):** Đối với sự kiện quy mô trên 500 người hoặc giải đấu cấp tỉnh, gửi kèm văn bản đề xuất / kế hoạch tổ chức gửi UBND Tỉnh & Ban Quản lý.\n"
-                "4. **Bước 4 — Thẩm định & Phê duyệt:** Ban Quản lý (`MANAGER` hoặc `ADMIN`) tiến hành kiểm tra xung đột và phê duyệt trong vòng 24 giờ làm việc.\n"
-                "5. **Bước 5 — Tiếp nhận & Bàn giao:** Đơn vị có mặt trước giờ diễn ra 30 phút để ký biên bản kiểm tra mặt sân và bàn giao trang thiết bị."
-            ),
-            "actions": ["Xem danh sách sân", "Gợi ý lịch trống"]
-        }
-
-    # =========================================================================
     # INTENT 4: NỘI QUY SỬ DỤNG SÂN & MƯỢN THIẾT BỊ (RULES)
     # =========================================================================
     if any(k in text_lower for k in [
@@ -400,6 +381,25 @@ def process_assistant_query(
                 "- **PCCC & Thoát hiểm:** Giữ thông thoáng toàn bộ các cửa thoát hiểm và hành lang phụ."
             ),
             "actions": ["Gợi ý lịch trống", "Quy trình xin cấp phép"]
+        }
+
+    # =========================================================================
+    # INTENT 3: QUY TRÌNH XIN CẤP PHÉP / GỬI ĐƠN ĐĂNG KÝ (PROCEDURE)
+    # =========================================================================
+    if any(k in text_lower for k in [
+        "gửi đơn", "đăng ký", "đăng kí", "quy trình", "thủ tục", "xin cấp phép", "hồ sơ", "đặt sân"
+    ]):
+        return {
+            "content": "text",
+            "text": (
+                "### 📋 Quy trình xin cấp phép đặt sân & tổ chức sự kiện tại Nhà thi đấu Tỉnh:\n\n"
+                "1. **Bước 1 — Kiểm tra lịch trống:** Truy cập mục **Lịch hoạt động** hoặc tra cứu trực tiếp qua Trợ lý AI để chọn ngày và khung giờ mong muốn.\n"
+                "2. **Bước 2 — Tạo yêu cầu đặt chỗ:** Vào mục **Đặt chỗ (Bookings)** -> Chọn **Tạo yêu cầu mới**, điền thông tin đơn vị tổ chức, mục đích và số lượng người tham dự.\n"
+                "3. **Bước 3 — Nộp hồ sơ bổ sung (nếu có):** Đối với sự kiện quy mô trên 500 người hoặc giải đấu cấp tỉnh, gửi kèm văn bản đề xuất / kế hoạch tổ chức gửi UBND Tỉnh & Ban Quản lý.\n"
+                "4. **Bước 4 — Thẩm định & Phê duyệt:** Ban Quản lý (`MANAGER` hoặc `ADMIN`) tiến hành kiểm tra xung đột và phê duyệt trong vòng 24 giờ làm việc.\n"
+                "5. **Bước 5 — Tiếp nhận & Bàn giao:** Đơn vị có mặt trước giờ diễn ra 30 phút để ký biên bản kiểm tra mặt sân và bàn giao trang thiết bị."
+            ),
+            "actions": ["Xem danh sách sân", "Gợi ý lịch trống"]
         }
 
     # =========================================================================
